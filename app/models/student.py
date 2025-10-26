@@ -1,16 +1,22 @@
-from tortoise.models import Model
-from tortoise import fields
+from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy.orm import relationship
+from app.extensions import Base
 
 
-class Student(Model):
-    user = fields.OneToOneField('models.User', on_delete=fields.CASCADE, primary_key=True)
-    age = fields.IntField(null=True)
-    gender = fields.CharField(max_length=10, null=True)
-    address = fields.CharField(max_length=255, null=True)
-    phone = fields.CharField(max_length=20, null=True)
-    department = fields.CharField(max_length=255, null=True)
-    major = fields.CharField(max_length=255, null=True)
-    enrollment_year = fields.IntField(null=True)
-    class_id = fields.IntField(null=True)
+class Student(Base):
+    __tablename__ = 'students'
+    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    age = Column(Integer, nullable=True)
+    gender = Column(String(10), nullable=True)
+    address = Column(String(255), nullable=True)
+    phone = Column(String(20), nullable=True)
+    department = Column(String(255), nullable=True)
+    major = Column(String(255), nullable=True)
+    enrollment_year = Column(Integer, nullable=True)
+    class_id = Column(Integer, nullable=True)
+    user = relationship('User', backref='student')
+
+    def __repr__(self):
+        return f'<Student {self.user_id}>'
 
 

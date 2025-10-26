@@ -5,10 +5,11 @@ sanic==25.3.0
 sanic-cors==2.2.0
 
 # Color formatting for terminal output
-termcolor==3.1.0
+termcolor==3.2.0
 
 # Asynchronous ORM
-tortoise-orm==0.25.1
+SQLAlchemy==2.0.44
 
 # PostgreSQL driver
-asyncpg==0.30.0
+psycopg2-binary==2.9.11
+jsonschema==4.25.1

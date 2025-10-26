@@ -3,10 +3,10 @@ from sqlalchemy.orm import relationship
 from app.extensions import Base
 
 
-class Lecturer(Base):
-    __tablename__ = 'lecturers'
+class HeadMaster(Base):
+    __tablename__ = 'head_masters'
     user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
-    user = relationship('User', backref='lecturer')
+    user = relationship('User', backref='head_master')
 
     def __repr__(self):
-        return f'<Lecturer {self.user_id}>'
+        return f'<HeadMaster {self.user_id}>'

@@ -1,12 +1,15 @@
-from tortoise import Tortoise
+from sqlalchemy import create_engine
+from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
 
-async def init_db(app):
-    await Tortoise.init(
-        db_url='postgres://postgres:postgres@localhost:5432/test',
-        modules={'models': ['app.models']}
-    )
-    await Tortoise.generate_schemas()
+engine = create_engine('postgresql://postgres:123456@localhost:5432/test')
+db_session = scoped_session(sessionmaker(autocommit=False,
+                                         autoflush=False,
+                                         bind=engine))
+Base = declarative_base()
+Base.query = db_session.query_property()
 
-    @app.listener('after_server_stop')
-    async def cleanup(app, loop):
-        await Tortoise.close_connections()
+
+def init_db():
+    import app.models
+    Base.metadata.create_all(bind=engine)

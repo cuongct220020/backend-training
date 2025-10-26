@@ -1,7 +1,11 @@
-from tortoise.models import Model
-from tortoise import fields
+from sqlalchemy import Column, Integer, String
+from app.extensions import Base
 
 
-class Classroom(Model):
-    id = fields.IntField(pk=True)
-    name = fields.CharField(max_length=255)
+class Classroom(Base):
+    __tablename__ = 'classrooms'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255))
+
+    def __repr__(self):
+        return f'<Classroom {self.name}>'
