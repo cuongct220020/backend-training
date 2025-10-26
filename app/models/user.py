@@ -1,29 +1,17 @@
 
 
 
-from abc import ABC, abstractmethod
+from tortoise.models import Model
+from tortoise import fields
 
 
-class User(ABC):
-    def __init__(self, user_id, first_name, last_name, email, password):
-        self.user_id = user_id
-        self._first_name = first_name
-        self._last_name = last_name
-        self._email = email
-        self._password = password
-        self._user_role = None
+class User(Model):
+    id = fields.IntField(pk=True)
+    first_name = fields.CharField(max_length=255)
+    last_name = fields.CharField(max_length=255)
+    email = fields.CharField(max_length=255, unique=True)
+    password = fields.CharField(max_length=255)
+    user_role = fields.CharField(max_length=50)
 
     def __str__(self):
-        return f"User ID: {self.user_id}, Name: {self._first_name} {self._last_name}, Email: {self._email}"
-
-    @abstractmethod
-    def login(self, email, password):
-        pass
-
-    @abstractmethod
-    def register(self):
-        pass
-
-    @abstractmethod
-    def update_personal_info(self):
-        pass
+        return f"User ID: {self.id}, Name: {self.first_name} {self.last_name}, Email: {self.email}"

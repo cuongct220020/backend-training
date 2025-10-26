@@ -1,19 +1,6 @@
-from app.models.user import User
+from tortoise.models import Model
+from tortoise import fields
 
 
-class Admin(User):
-    def __init__(self, user_id, first_name, last_name, email, password):
-        super().__init__(user_id, first_name, last_name, email, password)
-        self._user_role = 'admin'
-
-    def login(self, email, password):
-        # Implementation for admin login
-        pass
-
-    def register(self):
-        # Implementation for admin registration
-        pass
-
-    def update_personal_info(self):
-        # Implementation for updating admin personal info
-        pass
+class Admin(Model):
+    user = fields.OneToOneField('models.User', on_delete=fields.CASCADE, primary_key=True)
