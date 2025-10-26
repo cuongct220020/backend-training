@@ -5,7 +5,7 @@ from app.extensions import Base
 
 class HeadMaster(Base):
     __tablename__ = 'head_masters'
-    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), primary_key=True)
     user = relationship('User', backref='head_master')
 
     def __repr__(self):

@@ -1,15 +1,17 @@
 services:
   postgres:
-    image: postgres:latest
+    image: bitnami/postgresql:latest
     restart: always
+    env_file:
+      - .env
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=db
+      - POSTGRESQL_USERNAME=${DB_USER}
+      - POSTGRESQL_PASSWORD=${DB_PASSWORD}
+      - POSTGRESQL_DATABASE=${DB_NAME}
     ports:
-      - '5433:5432'
+      - '${DB_PORT}:5432'
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/bitnami/postgresql
 
 volumes:
   postgres_data:

@@ -35,11 +35,11 @@ def create_app(*config_cls) -> Sanic:
     for config in config_cls:
         sanic_app.update_config(config)
 
+    from app.extensions import init_db
+    init_db(sanic_app)
+
     register_extensions(sanic_app)
     register_views(sanic_app)
     register_hooks(sanic_app)
-
-    from app.extensions import init_db
-    init_db()
 
     return sanic_app

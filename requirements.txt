@@ -13,3 +13,6 @@ SQLAlchemy==2.0.44
 # PostgreSQL driver
 psycopg2-binary==2.9.11
 jsonschema==4.25.1
+
+# Environment variable management
+python-dotenv==1.0.1

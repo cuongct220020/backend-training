@@ -5,7 +5,7 @@ from app.extensions import Base
 
 class Student(Base):
     __tablename__ = 'students'
-    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), primary_key=True)
     age = Column(Integer, nullable=True)
     gender = Column(String(10), nullable=True)
     address = Column(String(255), nullable=True)
