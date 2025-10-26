@@ -1,3 +1,14 @@
-sanic
-sanic-cors
-termcolor
+# Web framework
+sanic==25.3.0
+
+# CORS support for Sanic
+sanic-cors==2.2.0
+
+# Color formatting for terminal output
+termcolor==3.1.0
+
+# Asynchronous ORM
+tortoise-orm==0.25.1
+
+# PostgreSQL driver
+asyncpg==0.30.0
