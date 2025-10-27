@@ -8,15 +8,11 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import declarative_base
-
+from app.extensions import Base
 from app.misc.log import log
 
 # Type alias for the session maker, following PascalCase convention
 AsyncSessionMaker: TypeAlias = async_sessionmaker[AsyncSession]
-
-# Base for all models to inherit from
-Base = declarative_base()
 
 
 class PostgreSQL:

@@ -1,5 +1,4 @@
 from .user import User
-from .admin import Admin
 from .classroom import Classroom
 from .course import Course
 from .course_registration import CourseRegistration
@@ -11,7 +10,6 @@ from .timetable import TimeTable
 
 __all__ = [
     'User',
-    'Admin',
     'Classroom',
     'Course',
     'CourseRegistration',
