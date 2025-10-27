@@ -19,7 +19,7 @@ psycopg2-binary==2.9.11
 Pygments==2.19.2
 pytest==8.4.2
 pytest-asyncio==1.2.0
-python-dotenv==1.0.1
+python-dotenv==1.2.1
 referencing==0.37.0
 rpds-py==0.28.0
 sanic==25.3.0
@@ -34,3 +34,7 @@ typing_extensions==4.15.0
 ujson==5.11.0
 uvloop==0.22.1
 websockets==15.0.1
+bcrypt==5.0.0
+jwt==1.4.0
+pydantic==2.8.2
+passlib==1.7.4
