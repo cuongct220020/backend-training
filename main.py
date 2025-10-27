@@ -1,37 +1,26 @@
-import os
-from dotenv import load_dotenv
-from sanic.response import text
+from typing import Final
 
 from app import create_app
-from app.apis import api
 from app.misc.log import log
-from config import Config, LocalDBConfig
+from config import Config, PostgreSQLConfig, DEFAULT_SECRET_KEY
 
-# Load environment before anything else
-load_dotenv()
+# Create the Sanic app instance as a module-level constant
+app: Final = create_app(Config, PostgreSQLConfig)
 
-# Create app at module-level (not inside __main__)
-app = create_app(Config, LocalDBConfig)
-app.blueprint(api)
+def main() -> None:
+    """Checks configuration and runs the application."""
+    # Warn if the default secret key is being used in a non-debug environment
+    if not app.config.get('DEBUG') and app.config.get('SECRET_KEY') == DEFAULT_SECRET_KEY:
+        log(
+            message='SECRET_KEY is using the insecure default value in a production environment. ' \
+                    'Please set a strong secret key in your environment variables.',
+            keyword='WARN'
+        )
 
-@app.route("/")
-async def hello_world(request):
-    return text("Hello World")
+    try:
+        app.run(**app.config['RUN_SETTING'])
+    except (KeyError, OSError) as e:
+        log(f'Failed to start server: {e}', keyword='ERROR')
 
-
-# Check environment & log info
-if not os.getenv("SECRET_KEY"):
-    log(message="SECRET_KEY is not set in environment variables.", keyword="WARN")
-
-log(message=f"Connecting to database: {LocalDBConfig.DATABASE_URI}", keyword="INFO")
-
-
-if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=1337,
-        debug=True,
-        access_log=True,
-        auto_reload=True,
-        workers=1
-    )
+if __name__ == '__main__':
+    main()
