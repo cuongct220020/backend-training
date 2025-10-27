@@ -4,27 +4,40 @@ from sanic_cors import CORS
 
 from app.misc.log import log
 
+#
+# def register_extensions(sanic_app: Sanic):
+#     from app import extensions
+#
+#     extensions.cors = CORS(sanic_app,resources={r"/*": {"origins": "*"}})
 
-def register_extensions(sanic_app: Sanic):
-    from app import extensions
 
-    extensions.cors = CORS(sanic_app,resources={r"/*": {"origins": "*"}})
+def register_listeners(sanic_app: Sanic):
+    from app.hooks.db_connections import setup_db, close_db
 
+    # Register startup and shutdown hooks
+    sanic_app.register_listener(setup_db, "before_server_start")
+    sanic_app.register_listener(close_db, "after_server_stop")
 
 def register_views(sanic_app: Sanic):
-    from app.views import route
+    from app.apis import api # Import the api Blueprint.group
 
-    route(sanic_app)
-
+    # Register the main API blueprint group with the /api/v1 prefix
+    sanic_app.blueprint(api, url_prefix="/api/v1")
 
 def register_hooks(sanic_app: Sanic):
-    from app.hooks.error import broad_exception_handler, sanic_exception_handler
     from app.hooks.request_context import after_request
+    from app.hooks.response_time import add_start_time
+    from app.hooks.response_time import add_spent_time
+    from app.hooks.request_auth import auth
 
-    sanic_app.register_middleware(after_request, 'response')
-    # sanic_app.error_handler.add(SanicException, sanic_app)
-    # sanic_app.error_handler.add(Exception, broad_exception_handler)
+    sanic_app.register_middleware(after_request, attach_to='response')
 
+    # Calculate response time
+    sanic_app.register_middleware(add_start_time, attach_to='request')
+    sanic_app.register_middleware(add_spent_time, attach_to='response')
+
+    # Authenticate
+    sanic_app.register_middleware(auth, attach_to='request')
 
 def create_app(*config_cls) -> Sanic:
     log(message='Sanic application initialized with {}'.format(', '.join([config.__name__ for config in config_cls])),
@@ -35,10 +48,8 @@ def create_app(*config_cls) -> Sanic:
     for config in config_cls:
         sanic_app.update_config(config)
 
-    from app.extensions import init_db
-    init_db(sanic_app)
-
-    register_extensions(sanic_app)
+    # register_extensions(sanic_app)
+    register_listeners(sanic_app)
     register_views(sanic_app)
     register_hooks(sanic_app)
 
