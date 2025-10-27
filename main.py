@@ -14,7 +14,7 @@ load_dotenv()
 app = create_app(Config, LocalDBConfig)
 app.blueprint(api)
 
-@app.route("/hello-world")
+@app.route("/")
 async def hello_world(request):
     return text("Hello World")
 
