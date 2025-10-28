@@ -1,11 +1,21 @@
-from sqlalchemy import Column, Integer, String
+# app/models/classroom.py
+from sqlalchemy import String, Integer
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import TYPE_CHECKING
 from app.extensions import Base
 
+if TYPE_CHECKING:
+    from .timetable import Timetable
 
 class Classroom(Base):
-    __tablename__ = 'classrooms'
-    id = Column(Integer, primary_key=True)
-    name = Column(String(255))
+    __tablename__ = "classrooms"
 
-    def __repr__(self):
-        return f'<Classroom {self.name}>'
+    classroom_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    room_number: Mapped[str] = mapped_column(String(20), nullable=False)
+    building_name: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    # --- Relationships ---
+    timetables: Mapped[list["Timetable"]] = relationship(back_populates="classroom")
+
+    def __repr__(self) -> str:
+        return f"<Classroom id={self.classroom_id}, room={self.room_number}, building={self.building_name}>"
