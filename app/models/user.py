@@ -1,8 +1,15 @@
-from datetime import datetime
-from sqlalchemy import String, Integer, DateTime
-from sqlalchemy.orm import Mapped, mapped_column
+# app/models/user.py
+from datetime import datetime, UTC
+from sqlalchemy import String, Integer, DateTime, Boolean
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import TYPE_CHECKING
 from app.extensions import Base
 
+if TYPE_CHECKING:
+    from .student import Student
+    from .lecturer import Lecturer
+    from .head_master import HeadMaster
+    from .admin import Admin
 
 class User(Base):
     __tablename__ = "users"
@@ -10,19 +17,21 @@ class User(Base):
     user_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     password: Mapped[str] = mapped_column(String(255), nullable=False)
-    user_role: Mapped[str] = mapped_column(String(50), default="member")
-
-    # (Các trường này tạm thời chưa cần trong giai đoạn login/register)
-    # email: Mapped[str] = mapped_column(String(255), unique=True, nullable=True)
-    # phone_number: Mapped[str] = mapped_column(String(255), nullable=True)
-    # address: Mapped[str] = mapped_column(String(255), nullable=True)
+    user_role: Mapped[str] = mapped_column(String(50), default="student")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=lambda: datetime.now(UTC), nullable=False
     )
     last_login: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=True
+        DateTime, default=lambda: datetime.now(UTC), nullable=True
     )
+
+    # --- Relationships ---
+    student_profile: Mapped["Student"] = relationship(back_populates="user", cascade="all, delete-orphan")
+    lecturer_profile: Mapped["Lecturer"] = relationship(back_populates="user", cascade="all, delete-orphan")
+    headmaster_profile: Mapped["HeadMaster"] = relationship(back_populates="user", cascade="all, delete-orphan")
+    admin_profile: Mapped["Admin"] = relationship(back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<User username={self.username}, role={self.user_role}>"
