@@ -18,7 +18,7 @@ class Student(Base):
     gender: Mapped[str] = mapped_column(String(10), nullable=False)
     email: Mapped[str] = mapped_column(String(100), nullable=False)
     major: Mapped[str] = mapped_column(String(20), nullable=False)
-    classroom: Mapped[str] = mapped_column(String(20), nullable=False)
+    class_name: Mapped[str] = mapped_column(String(20), nullable=False)
     enrollment_year: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # --- Foreign Keys ---

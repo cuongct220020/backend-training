@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from .user import User
     from .address import Address
     from .course import Course
+    from .curriculum import Curriculum
 
 class Lecturer(Base):
     __tablename__ = "lecturers"
@@ -26,6 +27,9 @@ class Lecturer(Base):
     user: Mapped["User"] = relationship(back_populates="lecturer_profile")
     address: Mapped["Address"] = relationship(back_populates="lecturers")
     courses_taught: Mapped[list["Course"]] = relationship(back_populates="lecturer")
+
+    # Một Lecturer (với role 'headmaster') có thể quản lý nhiều curriculum
+    curriculums: Mapped[list["Curriculum"]] = relationship(back_populates="lecturer")
 
     def __repr__(self) -> str:
         return f"<Lecturer lecturer_id={self.lecturer_id}>"

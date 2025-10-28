@@ -1,21 +1,16 @@
 # app/models/course_registration.py
 from datetime import datetime, UTC
-from enum import Enum
-from sqlalchemy import String, Integer, DateTime, ForeignKey
+
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql.sqltypes import Enum as SQLEnum
+from sqlalchemy.sql.schema import ForeignKey
+from sqlalchemy.sql.sqltypes import Enum as SQLEnum, Integer, DateTime, String
 from typing import TYPE_CHECKING
 from app.extensions import Base
+from app.constants.register_status_constants import RegistrationStatus
 
 if TYPE_CHECKING:
     from .student import Student
     from .course import Course
-
-
-class RegistrationStatus(Enum):
-    REGISTERED = "registered"
-    FULLED = "fulled"
-    CANCELLED = "cancelled"
 
 
 class CourseRegistration(Base):
