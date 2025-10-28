@@ -1,8 +1,9 @@
 # app/models/curriculum_subject.py
-from sqlalchemy import Integer, ForeignKey, Boolean
+from sqlalchemy import Integer, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import TYPE_CHECKING
 from app.extensions import Base
+from app.constants.subject_type_constants import SubjectType
 
 if TYPE_CHECKING:
     from .curriculum import Curriculum
@@ -11,7 +12,9 @@ if TYPE_CHECKING:
 class CurriculumSubject(Base):
     __tablename__ = "curriculum_subjects"
 
-    # --- Composite Primary Key ---
+    curriculum_subject_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # --- Foreign Keys ---
     curriculum_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("curriculums.curriculum_id"), primary_key=True
     )
@@ -19,13 +22,11 @@ class CurriculumSubject(Base):
         Integer, ForeignKey("subjects.subject_id"), primary_key=True
     )
 
-    # --- Extra Data ---
-    is_mandatory: Mapped[bool] = mapped_column(Boolean, default=True)
-    # Bạn có thể thêm các trường khác như: semester_recommended (học kỳ gợi ý)
+    type: Mapped[SubjectType] = mapped_column(SQLEnum(SubjectType), default=SubjectType.REQUIRED)
 
     # --- Relationships ---
     curriculum: Mapped["Curriculum"] = relationship(back_populates="subject_links")
     subject: Mapped["Subject"] = relationship(back_populates="curriculum_links")
 
     def __repr__(self) -> str:
-        return f"<CurriculumSubject c_id={self.curriculum_id}, s_id={self.subject_id}>"
+        return f"<CurriculumSubject curriculum_id={self.curriculum_id}, subject_id={self.subject_id}>"
