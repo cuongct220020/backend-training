@@ -1,43 +1,38 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-
-from app.models.user import User
+from app.repositories.user_repository import UserRepository
 from app.utils.security_utils import hash_password, verify_password, generate_jwt
 
 
-async def register_user(db_session: AsyncSession, username: str, password: str, role: str = "member"):
-    """Registers a new user after validating data and hashing the password."""
-    # Check if username exists
-    result = await db_session.execute(select(User).where(User.username == username))
-    if result.scalar_one_or_none():
+async def register_user(user_repo: UserRepository, username: str, password: str, role: str = "member"):
+    """Business logic for registering a new user."""
+    # 1. Check if username exists by calling the repository
+    existing_user = await user_repo.get_by_username(username)
+    if existing_user:
         return {"error": "Username already exists"}
 
-    # Hash password using the centralized security utility
+    # 2. Hash password
     hashed_pw = hash_password(password)
 
-    # Create new user instance
-    new_user = User(
-        username=username,
-        password=hashed_pw,
-        user_role=role
-    )
-
-    # Add to session and flush to get the ID
-    db_session.add(new_user)
-    await db_session.flush()
+    # 3. Create user data and call the repository to create the user
+    new_user_data = {
+        "username": username,
+        "password": hashed_pw,
+        "user_role": role
+    }
+    new_user = await user_repo.create(new_user_data)
+    await user_repo.session.flush()  # Flush to get the new user's ID
 
     return {"message": "User registered successfully", "user_id": new_user.id}
 
 
-async def login_user(db_session: AsyncSession, username: str, password: str):
-    """Handles user login, password verification, and JWT generation."""
-    result = await db_session.execute(select(User).where(User.username == username))
-    user = result.scalar_one_or_none()
+async def login_user(user_repo: UserRepository, username: str, password: str):
+    """Business logic for user login."""
+    # 1. Find user by username via repository
+    user = await user_repo.get_by_username(username)
 
-    # Verify password using the centralized security utility
+    # 2. Verify password
     if not user or not verify_password(password, user.password):
         return {"error": "Invalid username or password"}
 
-    # Create and return an access token on successful login
+    # 3. Generate and return an access token
     access_token = generate_jwt(subject=user.id)
     return {"message": "Login successful", "access_token": access_token, "token_type": "bearer"}

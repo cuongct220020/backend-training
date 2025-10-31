@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from app.services.auth_service import register_user, login_user
 from app.schemas.auth_schema import LoginSchema, RegisterSchema
+from app.repositories.user_repository import UserRepository
 
 
 class RegisterView(HTTPMethodView):
@@ -15,9 +16,12 @@ class RegisterView(HTTPMethodView):
         except ValidationError as e:
             return json({"error": e.errors()}, status=400)
 
-        # Get session from request context and inject it into the service
+        # Create repository instance with the session from the request context
+        user_repo = UserRepository(session=request.ctx.db_session)
+
+        # Inject repository into the service
         result = await register_user(
-            db_session=request.ctx.db_session,
+            user_repo=user_repo,
             username=auth_data.username,
             password=auth_data.password.get_secret_value(),
             role=auth_data.user_role.value
@@ -37,9 +41,12 @@ class LoginView(HTTPMethodView):
         except ValidationError as e:
             return json({"error": e.errors()}, status=400)
 
-        # Get session from request context and inject it into the service
+        # Create repository instance with the session from the request context
+        user_repo = UserRepository(session=request.ctx.db_session)
+
+        # Inject repository into the service
         result = await login_user(
-            db_session=request.ctx.db_session,
+            user_repo=user_repo,
             username=auth_data.username,
             password=auth_data.password.get_secret_value()
         )
