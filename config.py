@@ -18,12 +18,13 @@ class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', DEFAULT_SECRET_KEY)
 
 class PostgreSQLConfig:
+    DB_TYPE = os.getenv('DB_TYPE')
     DB_USER = os.getenv('DB_USER')
     DB_PASSWORD = os.getenv('DB_PASSWORD')
     DB_NAME = os.getenv('DB_NAME')
     DB_HOST = os.getenv('DB_HOST')
     DB_PORT = os.getenv('DB_PORT')
-    DATABASE_URI = f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
+    DATABASE_URI = f'{DB_TYPE}://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
 
 class RedisConfig:
     pass
