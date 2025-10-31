@@ -1,57 +1,44 @@
 from sanic.request import Request
 from sanic.response import json
 from sanic.views import HTTPMethodView
-from pydantic import ValidationError
 
-from app.services.auth_service import register_user, login_user
-from app.schemas.auth_schema import LoginSchema, RegisterSchema
+from app.decorators.validation import validate_request
+from app.hooks import exceptions
 from app.repositories.user_repository import UserRepository
+from app.schemas.auth_schema import LoginSchema
+from app.schemas.user_schema import UserCreate
+from app.services.auth_service import register_user, login_user
 
 
 class RegisterView(HTTPMethodView):
+    decorators = [validate_request(UserCreate)]
+
     async def post(self, request: Request):
         """Handle user registration."""
-        try:
-            auth_data = RegisterSchema.model_validate(request.json)
-        except ValidationError as e:
-            return json({"error": e.errors()}, status=400)
-
-        # Create repository instance with the session from the request context
+        user_create_data = request.ctx.validated_data
         user_repo = UserRepository(session=request.ctx.db_session)
 
-        # Inject repository into the service
-        result = await register_user(
-            user_repo=user_repo,
-            username=auth_data.username,
-            password=auth_data.password.get_secret_value(),
-            role=auth_data.user_role.value
-        )
-
-        if "error" in result:
-            return json(result, status=409)
-
-        return json(result, status=201)
+        try:
+            # Service now returns a UserRead DTO on success
+            new_user_dto = await register_user(user_repo, user_create_data)
+            return json(new_user_dto.model_dump(), status=201)
+        except exceptions.Conflict as e:
+            # Catch specific business logic exceptions from the service
+            return json({"error": str(e)}, status=e.status_code)
 
 
 class LoginView(HTTPMethodView):
+    decorators = [validate_request(LoginSchema)]
+
     async def post(self, request: Request):
         """Handle user login."""
-        try:
-            auth_data = LoginSchema.model_validate(request.json)
-        except ValidationError as e:
-            return json({"error": e.errors()}, status=400)
-
-        # Create repository instance with the session from the request context
+        login_data = request.ctx.validated_data
         user_repo = UserRepository(session=request.ctx.db_session)
 
-        # Inject repository into the service
-        result = await login_user(
-            user_repo=user_repo,
-            username=auth_data.username,
-            password=auth_data.password.get_secret_value()
-        )
-
-        if "error" in result:
-            return json(result, status=401)
-
-        return json(result, status=200)
+        try:
+            # Service now returns a Token DTO on success
+            token_dto = await login_user(user_repo, login_data)
+            return json(token_dto.model_dump(), status=200)
+        except exceptions.Unauthorized as e:
+            # Catch specific business logic exceptions from the service
+            return json({"error": str(e)}, status=e.status_code)

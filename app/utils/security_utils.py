@@ -24,15 +24,9 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 # -------------------- JWT UTILS -------------------- #
 
-def generate_jwt(subject: str | int, jwt_secret: str | None = None, expires_delta: timedelta | None = None) -> str:
-    """Generates a new JWT access token."""
+def generate_jwt(subject: str | int, extra_data: dict | None = None, expires_delta: timedelta | None = None) -> str:
+    """Generates a new JWT access token with extra data in the payload."""
     now = datetime.now(UTC)
-
-    # fallback to app config if jwt_secret not provided
-    if jwt_secret is None:
-        jwt_secret = app.config.JWT_SECRET
-
-    # expiry time
     expire = now + (expires_delta or timedelta(minutes=app.config.ACCESS_TOKEN_EXPIRE_MINUTES))
 
     payload = {
@@ -40,9 +34,11 @@ def generate_jwt(subject: str | int, jwt_secret: str | None = None, expires_delt
         "exp": expire,
         "iat": now
     }
+    
+    if extra_data:
+        payload.update(extra_data)
 
-    # use jwt.encode via module
-    token = jwt.encode(payload, jwt_secret, algorithm=app.config.JWT_ALGORITHM)
+    token = jwt.encode(payload, app.config.JWT_SECRET, algorithm=app.config.JWT_ALGORITHM)
     return token
 
 
