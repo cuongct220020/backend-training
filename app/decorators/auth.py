@@ -4,12 +4,13 @@ from app.hooks import exceptions
 from app.utils.security_utils import verify_jwt
 
 
-def check_token(jwt_secret, token):
+def check_token(token: str):
     if not token:
         raise exceptions.Unauthorized('Require JWT')
 
-    info = verify_jwt(jwt_secret, token)
-    if not info or not info.get('address'):
+    info = verify_jwt(token)
+    # A valid token must contain the subject claim
+    if not info or 'sub' not in info:
         raise exceptions.Unauthorized('Invalid JWT')
 
     return info
@@ -20,7 +21,6 @@ def protected(wrapped):
         @wraps(f)
         async def decorated_function(request, *args, **kwargs):
             info = check_token(
-                jwt_secret=request.app.config.JWT_SECRET,
                 token=request.headers.get('Authorization')
             )
 
