@@ -12,7 +12,6 @@ from app.extensions import Base
 from app.hooks import exceptions
 from app.utils.logger_utils import get_logger
 from app.models import User
-# from config import PostgreSQLConfig
 
 logger = get_logger(__name__)
 

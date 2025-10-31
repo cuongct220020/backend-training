@@ -2,9 +2,15 @@ from sqlalchemy.future import select
 from app.databases.postgresql import postgres_db
 from app.models.user import User
 from app.utils.security_utils import hash_password, verify_password, generate_jwt
+from main import app
 
 
-async def register_user(username: str, password: str, role: str = "member"):
+async def register_user(
+        username: str,
+        password: str,
+        role: str = "student"
+    ):
+
     async with postgres_db.get_session() as session:
         # Check if username exists
         result = await session.execute(select(User).where(User.username == username))
@@ -24,7 +30,11 @@ async def register_user(username: str, password: str, role: str = "member"):
         return {"message": "User registered successfully", "user_id": new_user.user_id}
 
 
-async def login_user(username: str, password: str):
+async def login_user(
+        username: str,
+        password: str
+    ):
+
     async with postgres_db.get_session() as session:
         result = await session.execute(select(User).where(User.username == username))
         user = result.scalar_one_or_none()
@@ -34,5 +44,8 @@ async def login_user(username: str, password: str):
             return {"error": "Invalid username or password"}
 
         # Create and return an access token on successful login
-        access_token = generate_jwt(subject=user.user_id)
+        jwt_secret = app.config.JWT_SECRET
+        expires_delta = app.config.ACCESS_TOKEN_EXPIRE_MINUTES
+
+        access_token = generate_jwt(subject=user.user_id, jwt_secret=jwt_secret, expires_delta=expires_delta)
         return {"message": "Login successful", "access_token": access_token, "token_type": "bearer"}

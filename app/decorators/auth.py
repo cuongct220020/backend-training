@@ -1,17 +1,16 @@
 from functools import wraps
 
-from sanic import Unauthorized, Forbidden
+from app.hooks import exceptions
+from app.utils.security_utils import verify_jwt
 
-from app.services.auth_service import decode_jwt
 
-
-def check_token(secret_key, token):
+def check_token(jwt_secret, token):
     if not token:
-        raise Unauthorized('Require JWT')
+        raise exceptions.Unauthorized('Require JWT')
 
-    info = decode_jwt(token, secret_key)
+    info = verify_jwt(jwt_secret, token)
     if not info or not info.get('address'):
-        raise Unauthorized('Invalid JWT')
+        raise exceptions.Unauthorized('Invalid JWT')
 
     return info
 
@@ -21,7 +20,7 @@ def protected(wrapped):
         @wraps(f)
         async def decorated_function(request, *args, **kwargs):
             info = check_token(
-                secret_key=request.app.config.SECRET,
+                jwt_secret=request.app.config.JWT_SECRET,
                 token=request.headers.get('Authorization')
             )
 
@@ -32,7 +31,7 @@ def protected(wrapped):
 
             resource_owner = kwargs.get('address')
             if resource_owner and (role != 'admin') and (resource_owner.lower() != address):
-                raise Forbidden('Permission denied')
+                raise exceptions.Forbidden('Permission denied')
 
             response = await f(request, *args, **kwargs)
             return response

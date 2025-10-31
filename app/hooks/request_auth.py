@@ -9,7 +9,7 @@ async def auth(request: Request):
         return
 
     info = check_token(
-        secret_key=request.app.config.SECRET_KEY,
+        jwt_secret=request.app.config.JWT_SECRET,
         token=request.headers.get('Authorization')
     )
 
@@ -25,7 +25,7 @@ async def auth(request: Request):
 
 def check_required_authenticate(request: Request):
     ignore_methods = ['OPTIONS']
-    ignore_paths = ['/', '/docs', '/api/v1/auth/login', '/api/v1/auth/register', '/favicon.ico']
+    ignore_paths = ['/', '/docs', '/register', '/favicon.ico']
     ignore_paths_prefix = ['/docs/']
 
     if request.method in ignore_methods:
