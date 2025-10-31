@@ -3,19 +3,30 @@ from dotenv import load_dotenv
 
 load_dotenv() # Load .env
 
+# Default configuration
+DEFAULT_APP_HOST = 'localhost'
+DEFAULT_APP_PORT = 1337
+DEFAULT_DEBUG_MODE = True
+DEFAULT_WORKER_COUNT = 4
+
 DEFAULT_JWT_SECRET = '85c145a16bd6f6e1f3e104ca78c6a102'
+DEFAULT_JWT_ALGORITHM = 'HS256'
+DEFAULT_JWT_EXPIRATION_MINUTES = 60
 
 class Config:
     RUN_SETTING = {
-        'host': os.getenv('APP_HOST', 'localhost'),
-        'port': int(os.getenv('APP_PORT', 1337)),
-        'debug': os.getenv('DEBUG', 'True').lower() == 'true',
+        'host': os.getenv('APP_HOST', DEFAULT_APP_HOST),
+        'port': int(os.getenv('APP_PORT', DEFAULT_APP_HOST)),
+        'debug': os.getenv('DEBUG', DEFAULT_DEBUG_MODE).lower() == 'true',
         "access_log": False,
         "auto_reload": True,
-        'workers': int(os.getenv('WORKERS', 4))
+        'workers': int(os.getenv('WORKERS', DEFAULT_WORKER_COUNT)),
     }
 
     JWT_SECRET = os.getenv('JWT_SECRET', DEFAULT_JWT_SECRET)
+    JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', DEFAULT_JWT_ALGORITHM)
+    JWT_ACCESS_TOKEN_EXPIRATION_SECONDS = os.getenv('JWT_ACCESS_TOKEN_EXPIRATION_MINUTES',
+                                                    DEFAULT_JWT_EXPIRATION_MINUTES)
 
 class PostgreSQLConfig:
     DB_TYPE = os.getenv('DB_TYPE')
