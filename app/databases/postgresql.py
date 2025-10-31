@@ -37,21 +37,16 @@ class PostgreSQL:
         logger.info(f"Database engine initialized: {database_uri}")
 
     async def create_tables(self) -> None:
-        """Creates the database tables."""
+        """Creates all database tables defined in the models."""
         if not self.engine:
             raise exceptions.ServerError("Database engine not initialized. Call setup() first.")
 
+        logger.info("Initializing database tables...")
         async with self.engine.begin() as conn:
-            # The original logic specifically targets the 'users' table.
-            if User and hasattr(User, '__table__'):
-                logger.info("Attempting to create 'users' table specifically...")
-                # We pass a list of Table objects to create_all
-                # User.__table__ is the Table object corresponding to the User model
-                await conn.run_sync(Base.metadata.create_all, tables=[User.__table__])
-            else:
-                logger.warning("User model not found, falling back to create_all. This might fail.")
-                # Fallback if User cannot be imported, which might cause an error
-                await conn.run_sync(Base.metadata.create_all)
+            # We import all models here to ensure they are registered with the Base.metadata
+            from app import models
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables initialized successfully.")
 
     @asynccontextmanager
     async def get_session(self) -> AsyncGenerator[AsyncSession, Any]:

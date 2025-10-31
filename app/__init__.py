@@ -1,5 +1,4 @@
 from sanic import Sanic
-from sanic.exceptions import SanicException
 from sanic_cors import CORS
 
 from app.utils.logger_utils import get_logger
@@ -14,7 +13,7 @@ logger = get_logger(__name__)
 
 
 def register_listeners(sanic_app: Sanic):
-    from app.hooks.db_connections import setup_db, close_db
+    from app.hooks.database import setup_db, close_db
 
     # Register startup and shutdown hooks
     sanic_app.register_listener(setup_db, "before_server_start")
@@ -30,13 +29,13 @@ def register_hooks(sanic_app: Sanic):
     from app.hooks.request_context import after_request
     from app.hooks.response_time import add_start_time, add_spent_time
     from app.hooks.request_auth import auth
-    from app.hooks.db_connections import acquire_db_connection, release_db_connection
+    from app.hooks.database import acquire_db_session, release_db_session
 
     sanic_app.register_middleware(after_request, attach_to='response')
 
     # Session per-request
-    sanic_app.register_middleware(acquire_db_connection, attach_to='request')
-    sanic_app.register_middleware(release_db_connection, attach_to='response')
+    sanic_app.register_middleware(acquire_db_session, attach_to='request')
+    sanic_app.register_middleware(release_db_session, attach_to='response')
 
     # Calculate response time
     sanic_app.register_middleware(add_start_time, attach_to='request')
