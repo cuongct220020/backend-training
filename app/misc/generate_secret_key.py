@@ -10,5 +10,5 @@ if __name__ == "__main__":
     print(f"\n{secret_key}\n")
     print("=" * 50)
     print("ACTION: Copy this key and paste it into your .env file.")
-    print("Example: SECRET_KEY=\"<your_key_here>\"")
+    print("Example: JWT_SECRET=\"<your_key_here>\"")
     print("=" * 50)
