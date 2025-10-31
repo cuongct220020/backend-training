@@ -7,9 +7,12 @@ from app.schemas.auth_schema import LoginSchema, Token
 from app.schemas.user_schema import UserCreate, UserRead
 from app.utils.security_utils import hash_password, verify_password, generate_jwt
 
-
-async def register_user(user_repo: UserRepository, user_data: UserCreate) -> UserRead:
+async def register_user(
+        user_repo: UserRepository,
+        user_data: UserCreate
+    ) -> UserRead:
     """Business logic for registering a new user."""
+
     # 1. Check if username exists
     existing_user = await user_repo.get_by_username(user_data.username)
     if existing_user:
@@ -31,8 +34,12 @@ async def register_user(user_repo: UserRepository, user_data: UserCreate) -> Use
     return UserRead.model_validate(new_user)
 
 
-async def login_user(user_repo: UserRepository, login_data: LoginSchema) -> Token:
+async def login_user(
+        user_repo: UserRepository,
+        login_data: LoginSchema
+    ) -> Token:
     """Business logic for user login."""
+
     # 1. Find user by username
     user = await user_repo.get_by_username(login_data.username)
 
