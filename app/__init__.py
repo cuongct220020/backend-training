@@ -29,8 +29,13 @@ def register_hooks(sanic_app: Sanic):
     from app.hooks.response_time import add_start_time
     from app.hooks.response_time import add_spent_time
     from app.hooks.request_auth import auth
+    from app.hooks.db_connections import acquire_db_connection, release_db_connection
 
     sanic_app.register_middleware(after_request, attach_to='response')
+
+    # Session per-request
+    sanic_app.register_middleware(acquire_db_connection, attach_to='request')
+    sanic_app.register_middleware(release_db_connection, attach_to='response')
 
     # Calculate response time
     sanic_app.register_middleware(add_start_time, attach_to='request')
