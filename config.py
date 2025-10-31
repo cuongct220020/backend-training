@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv() # Load .env
 
-DEFAULT_SECRET_KEY = '85c145a16bd6f6e1f3e104ca78c6a102'
+DEFAULT_JWT_SECRET = '85c145a16bd6f6e1f3e104ca78c6a102'
 
 class Config:
     RUN_SETTING = {
@@ -15,7 +15,7 @@ class Config:
         'workers': int(os.getenv('WORKERS', 4))
     }
 
-    SECRET_KEY = os.getenv('SECRET_KEY', DEFAULT_SECRET_KEY)
+    JWT_SECRET = os.getenv('JWT_SECRET', DEFAULT_JWT_SECRET)
 
 class PostgreSQLConfig:
     DB_TYPE = os.getenv('DB_TYPE')

@@ -2,7 +2,9 @@ from sanic import Sanic
 from sanic.exceptions import SanicException
 from sanic_cors import CORS
 
-from app.misc.log import log
+from app.utils.logger_utils import get_logger
+
+logger = get_logger(__name__)
 
 #
 # def register_extensions(sanic_app: Sanic):
@@ -26,8 +28,7 @@ def register_views(sanic_app: Sanic):
 
 def register_hooks(sanic_app: Sanic):
     from app.hooks.request_context import after_request
-    from app.hooks.response_time import add_start_time
-    from app.hooks.response_time import add_spent_time
+    from app.hooks.response_time import add_start_time, add_spent_time
     from app.hooks.request_auth import auth
     from app.hooks.db_connections import acquire_db_connection, release_db_connection
 
@@ -45,8 +46,7 @@ def register_hooks(sanic_app: Sanic):
     sanic_app.register_middleware(auth, attach_to='request')
 
 def create_app(*config_cls) -> Sanic:
-    log(message='Sanic application initialized with {}'.format(', '.join([config.__name__ for config in config_cls])),
-        keyword='INFO')
+    logger.info(f"Sanic application initialized with { ', '.join([config.__name__ for config in config_cls]) }")
 
     sanic_app = Sanic(__name__)
 
