@@ -16,7 +16,12 @@ class RegisterView(HTTPMethodView):
             # Pydantic's ValidationError provides detailed error messages
             return json({"error": e.errors()}, status=400)
 
-        result = await register_user(username=auth_data.username, password=auth_data.password)
+        # FIX: Handle SecretStr and Enum correctly, and fix attribute name
+        result = await register_user(
+            username=auth_data.username,
+            password=auth_data.password.get_secret_value(),
+            role=auth_data.user_role.value
+        )
         
         if "error" in result:
             return json(result, status=409)
@@ -32,7 +37,11 @@ class LoginView(HTTPMethodView):
         except ValidationError as e:
             return json({"error": e.errors()}, status=400)
 
-        result = await login_user(username=auth_data.username, password=auth_data.password)
+        # FIX: Handle SecretStr correctly
+        result = await login_user(
+            username=auth_data.username, 
+            password=auth_data.password.get_secret_value()
+        )
 
         if "error" in result:
             return json(result, status=401)
