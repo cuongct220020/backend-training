@@ -1,11 +1,11 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 import bcrypt
 import jwt
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv()  # Load environment variables
 JWT_SECRET = os.getenv('JWT_SECRET', 'dev-secret')
 JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', '60'))
@@ -24,24 +24,21 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 # jwt
-def create_access_token(subject: str | int, expires_delta: timedelta | None = None) -> str:
-    """Creates a new JWT access token."""
-    now = datetime.utcnow()
-    if expires_delta:
-        expire = now + expires_delta
-    else:
-        expire = now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+def generate_jwt(subject: str | int, expires_delta: timedelta | None = None) -> str:
+    """Generates a new JWT access token."""
+    now = datetime.now(UTC)
+    expire = now + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
 
     payload = {
         "sub": str(subject),
         "exp": expire,
-        "iat": now,
+        "iat": now
     }
+
     token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
     return token
 
-
-def decode_token(token: str) -> dict:
-    """Decodes a JWT token and returns its payload."""
+def verify_jwt(token: str) -> dict:
+    """Verifies a JWT token and returns its payload."""
     payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     return payload
