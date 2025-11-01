@@ -1,6 +1,19 @@
 services:
+  backend:
+    build: .
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "${APP_PORT:-1337}:1337"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - app-network
+
   postgres:
-    image: bitnami/postgresql:latest
+    image: bitnami/postgresql:16
     restart: always
     env_file:
       - .env
@@ -8,10 +21,23 @@ services:
       - POSTGRESQL_USERNAME=${DB_USER}
       - POSTGRESQL_PASSWORD=${DB_PASSWORD}
       - POSTGRESQL_DATABASE=${DB_NAME}
-    ports:
-      - '${DB_PORT}:5432'
     volumes:
       - postgres_data:/bitnami/postgresql
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
 
 volumes:
   postgres_data:
+  redis_data:
+
+networks:
+  app-network:
+    driver: bridge
