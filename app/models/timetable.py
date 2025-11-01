@@ -26,4 +26,4 @@ class Timetable(Base):
     classroom: Mapped["Classroom"] = relationship(back_populates="timetables")
 
     def __repr__(self) -> str:
-        return f"<Timetable course={self.course_id}, day={self.day_of_week}>"
+        return f"<Timetable id={self.timetable_id}, course_id={self.course_id}, day={self.day_of_week}, classroom_id={self.classroom_id}>"

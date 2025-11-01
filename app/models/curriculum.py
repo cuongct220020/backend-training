@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from app.extensions import Base
 
 if TYPE_CHECKING:
-    # Sửa: Import Lecturer thay vì HeadMaster
     from .lecturer import Lecturer
     from .subject import Subject
     from .curriculum_subject import CurriculumSubject
@@ -25,7 +24,7 @@ class Curriculum(Base):
     update_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     # --- Foreign Keys ---
-    lecturer_id: Mapped[str] = mapped_column(String(20), ForeignKey("lecturers.lecturer_id"), nullable=True)
+    lecturer_id: Mapped[str] = mapped_column(String(20), ForeignKey('lecturers.lecturer_id'), nullable=True)
 
     # --- Relationships ---
     lecturer: Mapped["Lecturer"] = relationship(back_populates="curriculums")

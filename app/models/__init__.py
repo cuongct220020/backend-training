@@ -1,3 +1,4 @@
+# app/models/__init__.py
 from .user import User
 from .classroom import Classroom
 from .course import Course
@@ -8,6 +9,8 @@ from .subject import Subject
 from .timetable import Timetable
 from .address import Address
 from .admin import Admin
+from .curriculum import Curriculum
+from .curriculum_subject import CurriculumSubject
 
 __all__ = [
     'User',
@@ -19,5 +22,7 @@ __all__ = [
     'Student',
     'Subject',
     'Timetable',
-    'Address'
+    'Address',
+    'Curriculum',
+    'CurriculumSubject'
 ]

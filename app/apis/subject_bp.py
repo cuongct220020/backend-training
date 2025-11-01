@@ -1,3 +1,4 @@
+# app/apis/suject_bp.py
 from sanic import Blueprint, response
 
 # Blueprint for subject-related APIs

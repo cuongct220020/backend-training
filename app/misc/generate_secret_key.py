@@ -1,3 +1,4 @@
+# app/misc/generate_secret_key.py
 import secrets
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+# app/hooks/database.py
 from sanic import Sanic, Request
 
 from app.databases.postgresql import postgres_db
