@@ -1,10 +1,10 @@
-# Hướng dẫn Sử dụng Alembic
+# Hướng dẫn sử dụng Alembic
 
 Tài liệu này là kim chỉ nam cho việc quản lý và cập nhật schema cơ sở dữ liệu của dự án.
 
 > **Cảnh báo:** Mọi thay đổi vào database **BẮT BUỘC** phải được thực hiện thông qua Alembic. Không bao giờ sửa schema trực tiếp bằng các công cụ như pgAdmin hay DBeaver.
 
-## 1. Thiết lập Ban đầu
+## 1. Thiết lập ban đầu
 
 Nếu bạn là thành viên mới hoặc cần thiết lập database từ đầu:
 
@@ -14,7 +14,7 @@ Nếu bạn là thành viên mới hoặc cần thiết lập database từ đ�
     alembic upgrade head
     ```
 
-## 2. Quy trình Chuẩn Khi Thay đổi Schema
+## 2. Quy trình chuẩn khi thay đổi Schema
 
 Khi bạn cần thay đổi cấu trúc database (thêm bảng, thêm cột, etc.), hãy tuân thủ nghiêm ngặt quy trình sau:
 
@@ -33,7 +33,7 @@ Khi bạn cần thay đổi cấu trúc database (thêm bảng, thêm cột, etc
     ```
 5.  **Commit:** Commit cả file model đã sửa và file migration mới vào Git.
 
-## 3. Lệnh Thường dùng
+## 3. Lệnh thường dùng
 
 <table>
   <thead>
@@ -78,9 +78,9 @@ Khi bạn cần thay đổi cấu trúc database (thêm bảng, thêm cột, etc
   </tbody>
 </table>
 
-## 4. Kỹ thuật Nâng cao & Best Practices
+## 4. Kỹ thuật nâng cao & Best Practices
 
-### Đặt tên Ràng buộc (Naming Convention)
+### Đặt tên ràng buộc (Naming Convention)
 
 > Luôn sử dụng `naming_convention` trong `MetaData` (đã cấu hình trong `app/models/__init__.py`). Điều này giúp Alembic không bị "bối rối" bởi các tên ràng buộc (constraint) do CSDL tự sinh ra, đảm bảo `autogenerate` hoạt động ổn định.
 
@@ -103,7 +103,7 @@ def upgrade() -> None:
     op.alter_column('users', 'status', nullable=False)
 ```
 
-### Làm việc Nhóm & Xử lý Xung đột
+### Làm việc nhóm & Xử lý xung đột
 
 Khi nhiều người cùng tạo migration trên các nhánh Git khác nhau, lịch sử Alembic có thể bị phân nhánh.
 
@@ -114,3 +114,16 @@ Khi nhiều người cùng tạo migration trên các nhánh Git khác nhau, l�
     alembic merge -m "Merge feature-A and feature-B branches" <rev_A> <rev_B>
     ```
 4.  **Kiểm tra và Commit:** Kiểm tra lại file merge và commit nó. Lịch sử sẽ trở lại tuyến tính.
+
+## 5. Kết luận
+
+Alembic không chỉ là công cụ mà là phương pháp luận chuyên nghiệp để quản lý sự tiến hóa của database. Các nguyên tắc cốt lõi: Schema as Code, Model là nguồn chân lý, đặt tên ràng buộc rõ ràng, và lập kế hoạch cẩn thận cho migration phức tạp.
+
+**Khuyến nghị:**
+- Luôn tạo migration sau khi thay đổi model
+- Xem xét kỹ mọi script được tạo tự động
+- Tích hợp migrations vào quy trình CI/CD
+- Sử dụng `alembic check` trong CI để đảm bảo đồng bộ
+
+Làm chủ Alembic là bước quan trọng trên con đường trở thành kỹ sư backend cấp cao.
+
