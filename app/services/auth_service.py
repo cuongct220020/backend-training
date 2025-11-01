@@ -1,7 +1,10 @@
 # app/service/auth_service
 from datetime import datetime, UTC
+from typing import cast
 
+from app.constants.user_role_constants import UserRole
 from app.extensions import redis_manager
+from app.hooks import exceptions
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth_schema import LoginSchema, Token
 from app.schemas.user_schema import UserCreate, UserRead
