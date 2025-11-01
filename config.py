@@ -38,4 +38,7 @@ class PostgreSQLConfig:
     DATABASE_URI = f'{DB_TYPE}://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
 
 class RedisConfig:
-    pass
+    """Redis configuration."""
+    HOST = os.getenv('REDIS_HOST', 'localhost')
+    PORT = int(os.getenv('REDIS_PORT', 6379))
+    DB = int(os.getenv('REDIS_DB', 0))

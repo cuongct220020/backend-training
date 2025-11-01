@@ -1,3 +1,4 @@
+# app/__init__.py
 from sanic import Sanic
 from sanic_cors import CORS
 
@@ -5,19 +6,23 @@ from app.utils.logger_utils import get_logger
 
 logger = get_logger(__name__)
 
-#
-# def register_extensions(sanic_app: Sanic):
-#     from app import extensions
-#
-#     extensions.cors = CORS(sanic_app,resources={r"/*": {"origins": "*"}})
+def register_extensions(sanic_app: Sanic):
+    from app import extensions
+
+    extensions.cors = CORS(sanic_app,resources={r"/*": {"origins": "*"}})
 
 
 def register_listeners(sanic_app: Sanic):
     from app.hooks.database import setup_db, close_db
+    from app.hooks.redis import setup_redis, close_redis
 
-    # Register startup and shutdown hooks
+    # Register database hooks
     sanic_app.register_listener(setup_db, "before_server_start")
     sanic_app.register_listener(close_db, "after_server_stop")
+
+    # Register Redis hooks
+    sanic_app.register_listener(setup_redis, "before_server_start")
+    sanic_app.register_listener(close_redis, "after_server_stop")
 
 def register_views(sanic_app: Sanic):
     from app.apis import api # Import the api Blueprint.group
@@ -52,7 +57,7 @@ def create_app(*config_cls) -> Sanic:
     for config in config_cls:
         sanic_app.update_config(config)
 
-    # register_extensions(sanic_app)
+    register_extensions(sanic_app)
     register_listeners(sanic_app)
     register_views(sanic_app)
     register_hooks(sanic_app)

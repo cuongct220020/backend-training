@@ -1,18 +1,15 @@
-from typing import cast
+# app/service/auth_service
+from datetime import datetime, UTC
 
-from app.constants.user_role_constants import UserRole
-from app.hooks import exceptions
+from app.extensions import redis_manager
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth_schema import LoginSchema, Token
 from app.schemas.user_schema import UserCreate, UserRead
 from app.utils.security_utils import hash_password, verify_password, generate_jwt
 
-async def register_user(
-        user_repo: UserRepository,
-        user_data: UserCreate
-    ) -> UserRead:
-    """Business logic for registering a new user."""
 
+async def register_user(user_repo: UserRepository, user_data: UserCreate) -> UserRead:
+    """Business logic for registering a new user."""
     # 1. Check if username exists
     existing_user = await user_repo.get_by_username(user_data.username)
     if existing_user:
@@ -34,12 +31,8 @@ async def register_user(
     return UserRead.model_validate(new_user)
 
 
-async def login_user(
-        user_repo: UserRepository,
-        login_data: LoginSchema
-    ) -> Token:
+async def login_user(user_repo: UserRepository, login_data: LoginSchema) -> Token:
     """Business logic for user login."""
-
     # 1. Find user by username
     user = await user_repo.get_by_username(login_data.username)
 
@@ -58,3 +51,16 @@ async def login_user(
     )
     
     return Token(access_token=access_token)
+
+
+async def logout_user(jti: str, exp: int):
+    """Adds a token's JTI to the deny-list until it expires."""
+    now_ts = int(datetime.now(UTC).timestamp())
+    # Calculate how many seconds the token has left to live
+    # Add a small buffer (e.g., 5s) to account for clock skew
+    remaining_time = exp - now_ts + 5
+
+    if remaining_time > 0:
+        await redis_manager.client.set(
+            f"deny_list:jti:{jti}", "revoked", ex=remaining_time
+        )

@@ -7,7 +7,7 @@ from app.hooks import exceptions
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth_schema import LoginSchema
 from app.schemas.user_schema import UserCreate
-from app.services.auth_service import register_user, login_user
+from app.services.auth_service import register_user, login_user, logout_user
 
 
 class RegisterView(HTTPMethodView):
@@ -42,3 +42,17 @@ class LoginView(HTTPMethodView):
         except exceptions.Unauthorized as e:
             # Catch specific business logic exceptions from the service
             return json({"error": str(e)}, status=e.status_code)
+
+
+class LogoutView(HTTPMethodView):
+    # This endpoint is protected by the global auth middleware
+    async def post(self, request: Request):
+        """Handle user logout by revoking the token."""
+        try:
+            jti = request.ctx.jti
+            exp = request.ctx.exp
+            await logout_user(jti=jti, exp=exp)
+            return json({"message": "Logout successful"}, status=200)
+        except AttributeError:
+            # This happens if the token was invalid and jti/exp were not set
+            return json({"error": "Invalid or missing token"}, status=401)
