@@ -1,40 +1,40 @@
 # Hướng dẫn Sử dụng Alembic
 
-## Nguyên tắc Cốt lõi
+Tài liệu này là kim chỉ nam cho việc quản lý và cập nhật schema cơ sở dữ liệu của dự án.
 
-- **Model là nguồn chân lý duy nhất** - Mọi thay đổi database phải bắt đầu từ việc sửa model SQLAlchemy (`app/models/`). Luồng làm việc: **Model → Migration Script → Database**.
-- **Không sửa database trực tiếp** - Thay đổi schema qua pgAdmin/DBeaver sẽ làm Alembic mất kiểm soát và gây lỗi.
-- **Migration là lịch sử** - Mỗi file trong `versions/` ghi lại một thay đổi, cho phép tiến/lùi trong lịch sử một cách an toàn.
+> **Cảnh báo:** Mọi thay đổi vào database **BẮT BUỘC** phải được thực hiện thông qua Alembic. Không bao giờ sửa schema trực tiếp bằng các công cụ như pgAdmin hay DBeaver.
 
-## Quy trình Chuẩn
+## 1. Thiết lập Ban đầu
 
-### 1. Sửa Model
-Thực hiện các thay đổi cần thiết trong các file model (VD: `app/models/user.py`): 
-- Thêm một class model mới. 
-- Thêm cột `Column` mới vào model hiện có. 
-- Thay đổi kiểu dữ liệu (vd: `nullable`, hoặc thêm `index`)
+Nếu bạn là thành viên mới hoặc cần thiết lập database từ đầu:
 
-### 2. Tạo Migration
-Mở terminal tại thư mục gốc của dự án và chạy lệnh sau:
-```bash
-alembic revision --autogenerate -m "Mô tả ngắn gọn"
-```
-- `--autogenerate`: Tự động tạo script dựa trên thay đổi của model
-- `-m`: Thông điệp rõ ràng (VD: "Add phone_number to User", "Create products table")
+1.  **Cấu hình kết nối:** Đảm bảo file `.env` ở thư mục gốc đã có đủ thông tin `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
+2.  **Tạo và áp dụng tất cả migration:** Chạy lệnh sau để tạo tất cả các bảng và cấu trúc theo lịch sử đã có.
+    ```bash
+    alembic upgrade head
+    ```
 
-### 3. Kiểm tra Script
-Mở file migration vừa được tạo trong `alembic/versions/`, **Luôn kiểm tra lại** file vừa tạo trong `alembic/versions/`:
-- `autogenerate` không hoàn hảo. Nó có thể bỏ sót các thay đổi phức tạp như đổi tên bảng/cột, thay đổi `server_default`, hoặc các ràng buộc `CHECK`.
-- Nếu bạn thêm một cột `NOT NULL` vào bảng đã có dữ liệu, bạn cần chỉnh sửa script để xử lý dữ liệu cũ trước (xem phần Kỹ thuật Nâng cao).
-- Đây là cơ hội cuối cùng để đảm bảo script sẽ chạy đúng như mong đợi.
+## 2. Quy trình Chuẩn Khi Thay đổi Schema
 
-### 4. Áp dụng Migration
-Sau khi đã hài lòng với kịch bản, hãy áp dụng nó vào database:
-```bash
-alembic upgrade head
-```
+Khi bạn cần thay đổi cấu trúc database (thêm bảng, thêm cột, etc.), hãy tuân thủ nghiêm ngặt quy trình sau:
 
-## Lệnh Thường dùng
+1.  **Sửa Model:** Thay đổi các class model trong `app/models/`.
+2.  **Tạo Script Migration:** Chạy lệnh sau để Alembic tự động phát hiện thay đổi.
+    ```bash
+    alembic revision --autogenerate -m "Mô tả ngắn gọn về thay đổi"
+    ```
+    > **Ví dụ:** `alembic revision --autogenerate -m "Add phone_number to User model"`
+3.  **KIỂM TRA SCRIPT (QUAN TRỌNG NHẤT):** Mở file migration vừa tạo trong `alembic/versions/` và đọc kỹ.
+    *   `autogenerate` không hoàn hảo. Nó có thể bỏ sót thay đổi phức tạp như đổi tên bảng/cột, thay đổi `server_default`, hoặc các ràng buộc `CHECK`.
+    *   **Luôn tự hỏi:** "Hàm `downgrade()` có hoạt động đúng không? Nó có thể hoàn tác thay đổi một cách an toàn không?"
+4.  **Áp dụng Migration:** Sau khi đã chắc chắn script đúng, áp dụng nó vào database của bạn.
+    ```bash
+    alembic upgrade head
+    ```
+5.  **Commit:** Commit cả file model đã sửa và file migration mới vào Git.
+
+## 3. Lệnh Thường dùng
+
 <table>
   <thead>
     <tr>
@@ -78,23 +78,39 @@ alembic upgrade head
   </tbody>
 </table>
 
-## Lưu ý Quan trọng
+## 4. Kỹ thuật Nâng cao & Best Practices
 
-### Đặt tên Ràng buộc
-Luôn sử dụng `naming_convention` trong `MetaData` để `autogenerate` hoạt động ổn định và migration di động được giữa các DB khác nhau (đã cấu hình trong `app/models/Base.py`).
+### Đặt tên Ràng buộc (Naming Convention)
 
-### Data Migration
-Khi cần chèn/cập nhật dữ liệu trong migration:
-- Dùng `op.bulk_insert()` để seed dữ liệu
-- Dùng `op.execute("UPDATE...")` để cập nhật
+> Luôn sử dụng `naming_convention` trong `MetaData` (đã cấu hình trong `app/models/__init__.py`). Điều này giúp Alembic không bị "bối rối" bởi các tên ràng buộc (constraint) do CSDL tự sinh ra, đảm bảo `autogenerate` hoạt động ổn định.
 
-**Ví dụ** thêm cột `status` `NOT NULL` vào bảng có dữ liệu:
-1. Tạo cột `nullable=True`
-2. `op.execute("UPDATE users SET status = 'active'")`
-3. `op.alter_column('users', 'status', nullable=False)`
+### Data Migration (Di trú Dữ liệu)
 
-### Làm việc Nhóm
-Khi nhiều người tạo migration trên các nhánh khác nhau:
-1. Sau `git merge`, chạy `alembic branches` - nếu thấy nhiều `head` nghĩa là bị phân nhánh
-2. Chạy `alembic merge -m "Merge branches" <rev_A> <rev_B>`
-3. Commit file merge, lịch sử trở lại tuyến tính
+Khi cần chèn/cập nhật dữ liệu như một phần của migration.
+
+**Ví dụ: Thêm cột `status` `NOT NULL` vào bảng `users` đã có dữ liệu.**
+
+Cách tiếp cận an toàn là chia làm 3 bước trong cùng một migration script:
+```python
+def upgrade() -> None:
+    # Bước 1: Thêm cột mới nhưng cho phép NULL
+    op.add_column('users', sa.Column('status', sa.String(50), nullable=True))
+
+    # Bước 2: Cập nhật giá trị mặc định cho tất cả các dòng hiện có
+    op.execute("UPDATE users SET status = 'active' WHERE status IS NULL")
+
+    # Bước 3: Thay đổi cột thành NOT NULL
+    op.alter_column('users', 'status', nullable=False)
+```
+
+### Làm việc Nhóm & Xử lý Xung đột
+
+Khi nhiều người cùng tạo migration trên các nhánh Git khác nhau, lịch sử Alembic có thể bị phân nhánh.
+
+1.  **Phòng ngừa:** Trước khi tạo migration mới, hãy luôn `git pull` hoặc `git rebase` nhánh chính để cập nhật code mới nhất.
+2.  **Phát hiện:** Sau khi `git merge`, chạy `alembic branches`. Nếu thấy nhiều `head`, nghĩa là lịch sử đã bị phân nhánh.
+3.  **Hợp nhất (Merge):** Chạy lệnh `merge` để tạo một file migration hợp nhất.
+    ```bash
+    alembic merge -m "Merge feature-A and feature-B branches" <rev_A> <rev_B>
+    ```
+4.  **Kiểm tra và Commit:** Kiểm tra lại file merge và commit nó. Lịch sử sẽ trở lại tuyến tính.
