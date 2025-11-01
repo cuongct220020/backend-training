@@ -9,31 +9,32 @@
 ## Quy trình Chuẩn
 
 ### 1. Sửa Model
-Chỉnh sửa các file model (VD: `app/models/user.py`): thêm bảng mới, thêm cột, đổi kiểu dữ liệu, thêm index...
+Thực hiện các thay đổi cần thiết trong các file model (VD: `app/models/user.py`): 
+- Thêm một class model mới. 
+- Thêm cột `Column` mới vào model hiện có. 
+- Thay đổi kiểu dữ liệu (vd: `nullable`, hoặc thêm `index`)
 
 ### 2. Tạo Migration
+Mở terminal tại thư mục gốc của dự án và chạy lệnh sau:
 ```bash
 alembic revision --autogenerate -m "Mô tả ngắn gọn"
 ```
 - `--autogenerate`: Tự động tạo script dựa trên thay đổi của model
 - `-m`: Thông điệp rõ ràng (VD: "Add phone_number to User", "Create products table")
 
-### 3. Kiểm tra Script 
-**Bắt buộc kiểm tra** file vừa tạo trong `alembic/versions/`:
-```
-autogenerate` không hoàn hảo, có thể bỏ sót: đổi tên bảng/cột, `server_default`, ràng buộc `CHECK`
-```
-
-- Nếu thêm cột `NOT NULL` vào bảng có dữ liệu, cần xử lý dữ liệu cũ trước
-- Đây là cơ hội cuối để đảm bảo script chạy đúng
+### 3. Kiểm tra Script
+Mở file migration vừa được tạo trong `alembic/versions/`, **Luôn kiểm tra lại** file vừa tạo trong `alembic/versions/`:
+- `autogenerate` không hoàn hảo. Nó có thể bỏ sót các thay đổi phức tạp như đổi tên bảng/cột, thay đổi `server_default`, hoặc các ràng buộc `CHECK`.
+- Nếu bạn thêm một cột `NOT NULL` vào bảng đã có dữ liệu, bạn cần chỉnh sửa script để xử lý dữ liệu cũ trước (xem phần Kỹ thuật Nâng cao).
+- Đây là cơ hội cuối cùng để đảm bảo script sẽ chạy đúng như mong đợi.
 
 ### 4. Áp dụng Migration
+Sau khi đã hài lòng với kịch bản, hãy áp dụng nó vào database:
 ```bash
 alembic upgrade head
 ```
 
 ## Lệnh Thường dùng
-
 <table>
   <thead>
     <tr>
