@@ -5,8 +5,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.schema import ForeignKey
 from sqlalchemy.sql.sqltypes import Enum as SQLEnum, Integer, DateTime, String
 from typing import TYPE_CHECKING
-from app.extensions import Base
 from app.constants.register_status_constants import RegistrationStatus
+
+from .base import Base
 
 if TYPE_CHECKING:
     from .student import Student

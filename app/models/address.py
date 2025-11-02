@@ -2,7 +2,7 @@
 from sqlalchemy import String, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import TYPE_CHECKING
-from app.extensions import Base
+from .base import Base
 
 if TYPE_CHECKING:
     from .student import Student

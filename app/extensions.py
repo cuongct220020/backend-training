@@ -1,9 +1,5 @@
 # app/extensions.py
-from sqlalchemy.orm import declarative_base
 from redis.asyncio import Redis, ConnectionPool
-
-# Base for all models to inherit from
-Base = declarative_base()
 
 # Redis manager
 class RedisManager:

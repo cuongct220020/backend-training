@@ -2,8 +2,9 @@
 from sqlalchemy import Integer, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import TYPE_CHECKING
-from app.extensions import Base
 from app.constants.subject_type_constants import SubjectType
+
+from .base import Base
 
 if TYPE_CHECKING:
     from .curriculum import Curriculum

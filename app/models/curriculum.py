@@ -4,7 +4,8 @@ from sqlalchemy import String, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.ext.associationproxy import association_proxy
 from typing import TYPE_CHECKING
-from app.extensions import Base
+
+from .base import Base
 
 if TYPE_CHECKING:
     from .lecturer import Lecturer

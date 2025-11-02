@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from app.extensions import Base
+from app.models.base import Base
 from app.hooks import exceptions
 from app.utils.logger_utils import get_logger
 from app.models import User
