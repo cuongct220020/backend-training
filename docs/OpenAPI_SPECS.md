@@ -1,5 +1,46 @@
 # OpenAPI Specs Handbook
 
+## Mục lục
+
+### Phần I. OpenAPI Specification (OAS)
+
+1.  [Tổng quan về OpenAPI Specification (OAS) - Nền tảng API hiện đại](#1-tổng-quan-về-openapi-specification-oas---nền-tảng-api-hiện-đại)
+    * [1.2. Cấu trúc tài liệu: YAML so với JSON](#12-cấu-trúc-tài-liệu-yaml-so-với-json)
+    * [1.3. Đối tượng gốc `openapi`, `info` và `servers`](#13-đối-tượng-gốc-openapi-info-và-servers)
+2.  [Định nghĩa bề mặt API với paths và operations](#2-định-nghĩa-bề-mặt-api-với-paths-và-operations)
+    * [2.1. Đối tượng `paths`: Ánh xạ URL tới các thao tác](#21-đối-tượng-paths-ánh-xạ-url-tới-các-thao-tác)
+    * [2.2. Đối tượng `operations`: Các phương thức HTTP và Siêu dữ liệu](#22-đối-tượng-operations-các-phương-thức-http-và-siêu-dữ-liệu)
+    * [2.3. Mô tả tham số (`path`, `query`, `header`, `cookie`)](#23-mô-tả-tham-số-path-query-header-cookie)
+3.  [Nền tảng của tái sử dụng `components` và `schemas`](#3-nền-tảng-của-tái-sử-dụng-components-và-schemas)
+    * [3.1. Nguyên tắc DRY trong định nghĩa API: Đối tượng `components`](#31-nguyên- tắc-dry-trong-định-nghĩa-api-đối-tượng-components)
+    * [3.2. Định nghĩa cấu trúc dữ liệu với `schemas`](#32-định-nghĩa-cấu-trúc-dữ-liệu-với-schemas)
+    * [3.3. Liên kết mọi thứ với `$ref`](#33-liên-kết-mọi-thứ-với-ref)
+4.  [Mô tả tải trọng và phản hồi](#4-mô-tả-tải-trọng-và-phản-hồi)
+    * [4.1. Đối tượng `requestBody`](#41-đối-tượng-requestbody)
+    * [4.2. Đối tượng `responses`](#42-đối-tượng-responses)
+    * [4.3. Kết hợp lại một định nghĩa Endpoint hoàn chỉnh](#43-kết-hợp-lại-một-định-nghĩa-endpoint-hoàn-chỉnh)
+
+### Phần II. Tài liệu hoá API Sanic với `sanic-ext`
+
+5.  [Hệ sinh thái Sanic và vai trò của `sanic-ext`](#5-hệ-sinh-thái-sanic-và-vai-trò-của-sanic-ext)
+    * [5.1. Giới thiệu về `sanic-ext`](#51-giới-thiệu-về-sanic-ext)
+6.  [Tài liệu hoá dựa trên Decorator trong Sanic](#6-tài-liệu-hoá-dựa-trên-decorator-trong-sanic)
+    * [6.1. Decorator `@openapi`](#61-decorator-openapi)
+    * [6.2. Tài liệu hoá thao tác và tham số](#62-tài-liệu-hoá-thao-tác-và-tham-số)
+    * [6.3. Định nghĩa phần thân yêu cầu và phản hồi](#63-định-nghĩa-phần-thân-yêu-cầu-và-phản-hồi)
+7.  [Triển khai CRUD Sanic hoàn chỉnh](#7-triển-khai-crud-sanic-hoàn-chỉnh)
+
+### Phần III. Các chủ đề nâng cao và phương pháp kiến trúc tốt nhất
+
+8.  [Các chiến lược đánh phiên bản API trong OpenAPI](#8-các-chiến-lược-đánh-phiên-bản-api-trong-openapi)
+    * [8.1. Tại sao đánh phiên bản lại quan trọng](#81-tại-sao-đánh-phiên-bản-lại-quan-trọng)
+    * [8.2. Các chiến lược đánh phiên bản phổ biến](#82-các-chiến-lược-đánh-phiên-bản-phổ-biến)
+9.  [Thiết kế vì tính nhất quán và khả năng bảo trì](#9-thiết-kế-vì-tính-nhất-quán-và-khả-năng-bảo-trì)
+    * [9.1. Cuộc tranh luận "Design-First" và "Code-First"](#91-cuộc-tranh-luận-design-first-và-code-first)
+    * [9.2. Tối đa hóa tái sử dụng với `components`](#92-tối-đa-hóa-tái-sử-dụng-với-components)
+    * [9.3. Phản hồi lỗi được tiêu chuẩn hoá](#93-phản-hồi-lỗi-được-tiêu-chuẩn-hoá)
+10. [Kết luận](#10-kết-luận)
+
 ## Phần I. OpenAPI Specification (OAS)
 
 ### 1. Tổng quan về OpenAPI Specification (OAS) - Nền tảng API hiện đại
