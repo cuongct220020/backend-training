@@ -5,6 +5,6 @@
 
 
 
-![class-diagram](./docs/uml-diagram/class-diagram/class_diagram.png)
+![class-diagram](docs/uml-diagram/entity-relationship-diagram/entity_relationship_diagram.png)
 
 
