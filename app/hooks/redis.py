@@ -11,9 +11,9 @@ async def setup_redis(_app: Sanic):
     """Hook to initialize the Redis connection pool."""
     logger.info("Initializing Redis connection pool...")
     redis_manager.setup(
-        host=RedisConfig.HOST,
-        port=RedisConfig.PORT,
-        db=RedisConfig.DB
+        host=RedisConfig.REDIS_HOST,
+        port=RedisConfig.REDIS_PORT,
+        db=RedisConfig.REDIS_DB
     )
     # Ping to check connection
     await redis_manager.client.ping()
