@@ -1,23 +1,5 @@
 # BACKEND API HANDBOOK
 
-## 1. Tổng quan về OpenAPI Specification (OAS) - Nền tảng API hiện đại
-
-Trong phát triển API hiện đại, việc bắt đầu bằng việc viết tài liệu không còn là một công việc tẻ nhạt sau khi đã hoàn thành, mà đã trở thành một bước đi chiến lược, một công cụ thiết kế cộng tác mạnh mẽ. **OpenAPI Specification (OAS)** chính là trung tâm của triết lý này.
-
-**OpenAPI Specification** (trước đây là Swagger Specification) là một định dạng mô tả API cho các REST API. Nó định nghĩa một giao diện tiêu chuẩn, độc lập với ngôn ngữ lập trình, cho phép cả con người và máy tính khám phá và hiểu được khả năng của một dịch vụ mà không cần truy cập vào mã nguồn, tài liệu bổ sung, hay kiểm tra lưu lượng mạng.
-
-**Triết lý "Design First"**: Cốt lõi của việc sử dụng OAS là triết lý "design-first" (thiết kế trước). Thay vì viết mã trước rồi tạo tài liệu sau, việc xác định "hợp đồng" API (API Contract) bằng một tệp YAML hoặc JSON mang lại nhiều lợi ích chiến lược:
-
-- **Kiến trúc tốt hơn**: Buộc các nhà phát triển phải suy nghĩ thấu đáo về các tài nguyên, endpoints, tham số và schema dữ liệu trước khi viết một dòng mã nào.
-- **Phát triển song song**: Khi hợp đồng đã được thống nhất, các nhóm frontend, backend và QA có thể làm việc song song. Nhóm frontend có thể tạo mock server dựa trên đặc tả, trong khi nhóm backend triển khai logic nghiệp vụ.
-- **Tự động hóa**: Một đặc tả OpenAPI có thể được sử dụng để tự động tạo ra server stubs (khung sườn server), client libraries (thư viện phía client) cho hơn 40 ngôn ngữ, và các bộ kiểm thử tự động, giúp giảm đáng kể thời gian và công sức phát triển.
-
-**Swagger và OpenAPI**: "OpenAPI Specification" là tên của bản thân đặc tả tiêu chuẩn, "Swagger" là tên của một bộ công cụ mã nguồn mở được xây dựng xung quanh đặc tả này:
-
-- **Swagger Editor**: Trình soạn thảo dựa trên trình duyệt để viết các định nghĩa OpenAPI.
-- **Swagger UI**: Công cụ hiển thị các định nghĩa OpenAPI dưới dạng tài liệu API tương tác, cho phép người dùng thử gọi API trực tiếp từ trình duyệt.
-- **Swagger Codegen**: Công cụ tạo ra server stubs và client libraries từ một định nghĩa OpenAPI.
-
 ## 2. Các cơ chế xác thực
 
 ### 2.1. Phân biệt Authentication vs. Authorization
