@@ -4,13 +4,16 @@ from pydantic import Field, SecretStr, field_validator
 
 from app.constants.user_role_constants import UserRole
 from app.hooks import exceptions
-from app.schemas.base_schema import BaseSchema
+from app.schemas import BaseSchema
 
+
+from typing import Union, Literal
 
 # --- Profile Schemas (for reading nested user data) ---
 
 class StudentRead(BaseSchema):
     """Schema for reading student-specific profile data."""
+    user_role: Literal[UserRole.STUDENT]
     student_id: str
     major: str
     class_name: str
@@ -18,6 +21,7 @@ class StudentRead(BaseSchema):
 
 class LecturerRead(BaseSchema):
     """Schema for reading lecturer-specific profile data."""
+    user_role: Literal[UserRole.LECTURER]
     lecturer_id: str
     title: str | None
     department: str | None
@@ -25,6 +29,7 @@ class LecturerRead(BaseSchema):
 
 class AdminRead(BaseSchema):
     """Schema for reading admin-specific profile data."""
+    user_role: Literal[UserRole.ADMIN]
     user_id: int
 
 
@@ -62,9 +67,11 @@ class UserUpdate(BaseSchema):
 
 
 class UserRead(UserBase):
-    """Schema for reading a user, including nested profile information."""
+    """
+    Schema for reading a user.
+    The 'profile' field will be correctly parsed into one of the specific
+    profile schemas based on the 'user_role' discriminator.
+    """
     user_id: int
     is_active: bool
-    student_profile: StudentRead | None = None
-    lecturer_profile: LecturerRead | None = None
-    admin_profile: AdminRead | None = None
+    profile: Union[StudentRead, LecturerRead, AdminRead] = Field(discriminator='user_role')
