@@ -2,12 +2,12 @@ from typing import Final
 
 from app import create_app
 from app.utils.logger_utils import get_logger
-from config import Config, PostgreSQLConfig, DEFAULT_JWT_SECRET
+from config import Config, PostgreSQLConfig, RedisConfig, DEFAULT_JWT_SECRET
 
 logger = get_logger(__name__)
 
 # Create the Sanic app instance as a module-level constant
-app: Final = create_app(Config, PostgreSQLConfig)
+app: Final = create_app(Config, PostgreSQLConfig, RedisConfig)
 
 def main() -> None:
     """Checks configuration and runs the application."""

@@ -56,3 +56,5 @@ ujson==5.11.0
 uvloop==0.22.1
 websockets==15.0.1
 yarl==1.22.0
+factory-boy==3.3.3
+aioredis==2.0.1
