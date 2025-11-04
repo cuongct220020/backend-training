@@ -2,7 +2,7 @@
 from sanic import Sanic, Request
 
 from app.databases.postgresql import postgres_db
-from app.hooks import exceptions
+from app.exceptions import ServerError
 
 
 async def setup_db(app: Sanic):
@@ -29,7 +29,7 @@ async def acquire_db_session(request: Request):
     This runs before the request handler.
     """
     if not postgres_db.session_maker:
-        raise exceptions.ServerError("Database not initialized. Call setup() first.")
+        raise ServerError("Database not initialized. Call setup() first.")
     request.ctx.db_session = postgres_db.session_maker()
 
 

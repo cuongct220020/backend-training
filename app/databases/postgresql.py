@@ -9,9 +9,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from app.models.base import Base
-from app.hooks import exceptions
+from app.exceptions import ServerError
 from app.utils.logger_utils import get_logger
-from app.models import User
 
 logger = get_logger(__name__)
 
@@ -39,12 +38,10 @@ class PostgreSQL:
     async def create_tables(self) -> None:
         """Creates all database tables defined in the models."""
         if not self.engine:
-            raise exceptions.ServerError("Database engine not initialized. Call setup() first.")
+            raise ServerError("Database engine not initialized. Call setup() first.")
 
         logger.info("Initializing database tables...")
         async with self.engine.begin() as conn:
-            # We import all models here to ensure they are registered with the Base.metadata
-            from app import models
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables initialized successfully.")
 
@@ -52,7 +49,7 @@ class PostgreSQL:
     async def get_session(self) -> AsyncGenerator[AsyncSession, Any]:
         """Provide a transactional session."""
         if not self.session_maker:
-            raise exceptions.ServerError("Database not initialized. Call setup() first.")
+            raise ServerError("Database not initialized. Call setup() first.")
 
         session = self.session_maker()
         try:
