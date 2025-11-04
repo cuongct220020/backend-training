@@ -33,8 +33,8 @@ def register_views(sanic_app: Sanic):
 def register_hooks(sanic_app: Sanic):
     from app.hooks.request_context import after_request
     from app.hooks.response_time import add_start_time, add_spent_time
-    from app.hooks.request_auth import auth
     from app.hooks.database import acquire_db_session, release_db_session
+    from app.hooks.request_auth import auth
 
     sanic_app.register_middleware(after_request, attach_to='response')
 
@@ -46,7 +46,7 @@ def register_hooks(sanic_app: Sanic):
     sanic_app.register_middleware(add_start_time, attach_to='request')
     sanic_app.register_middleware(add_spent_time, attach_to='response')
 
-    # Authenticate
+    # Authentication
     sanic_app.register_middleware(auth, attach_to='request')
 
 def create_app(*config_cls) -> Sanic:
