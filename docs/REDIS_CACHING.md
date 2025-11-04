@@ -32,6 +32,11 @@
   * [4.2. Trường hợp 2: Vô hiệu hoá JWT với Backlist](#42-trường-hợp-2-vô-hiệu-hoá-jwt-với-backlist)
   * [4.3. Trường hợp 3: Giới hạn tần suất truy cập (Rate Limiting)](#43-trường-hợp-3-giới-hạn-tần-suất-truy-cập-rate-limiting)
 
+[Phần V. Thao tác với Redis qua CLI](#phần-v-thao-tác-với-redis-qua-cli)
+  * [5.1. Cài đặt & Chạy Redis (qua Docker)](#51-cài-đặt--chạy-redis-qua-docker)
+  * [5.2. Kết nối và thao tác với Redis CLI](#52-kết-nối-và-thao-tác-với-redis-cli)
+  * [5.3. Atomic Operations: MULTI / EXEC](#53-atomic-operations-multi--exec)
+  * [5.4. Monitoring cơ bản](#54-monitoring-cơ-bản)
 
 ## Phần I. Nền tảng về Caching
 ### 1.1. Tầm quan trọng của Caching trong ứng duyệt Web
@@ -623,3 +628,119 @@ _Lưu ý: Đoạn mã trên sử dụng hai lệnh riêng biệt (`INCR` và `TT
 Một cách tiếp cận khác, đơn giản hơn nhưng có một race condition nhỏ, là `INCR` trước, 
 sau đó kiểm tra nếu kết quả là 1 thì `EXPIRE`. Với `aioredis`, pipeline đảm bảo các lệnh được gửi cùng nhau, giảm độ trễ mạng._
 
+## Phần V. Thao tác với Redis qua CLI
+
+Báo cáo tập trung vào việc tích hợp Redis vào code, nhưng việc hiểu cách thao tác trực tiếp với Redis qua giao diện dòng lệnh (CLI) là một kỹ năng cực kỳ quan trọng để gỡ lỗi và kiểm tra dữ liệu.
+
+### 5.1. Cài đặt & Chạy Redis (qua Docker)
+
+Cách đơn giản và phổ biến nhất để chạy Redis cho môi trường phát triển là sử dụng Docker.
+```bash
+# Tải image Redis mới nhất từ Docker Hub
+docker pull redis
+
+# Chạy một container Redis, đặt tên là "my-redis-instance"
+# -d: chạy ở chế độ detached (chạy nền)
+# -p 6379:6379: ánh xạ cổng 6379 của máy bạn vào cổng 6379 của container
+docker run --name my-redis-instance -d -p 6379:6379 redis
+```
+
+### 5.2. Kết nối và thao tác với Redis CLI
+
+Sau khi container đang chạy, bạn có thể kết nối vào Redis CLI:
+```bash
+# Kết nối vào Redis CLI bên trong container đang chạy
+docker exec -it my-redis-instance redis-cli
+```
+
+Bây giờ bạn đang ở trong giao diện dòng lệnh của Redis. Hãy thử các lệnh cơ bản:
+```
+# Kiểm tra kết nối, server sẽ trả về "PONG"
+127.0.0.1:6379> PING
+PONG
+
+# Lưu một key-value. "OK" có nghĩa là thành công.
+127.0.0.1:6379> SET user:100:name "John Doe"
+OK
+
+# Lấy giá trị của một key
+127.0.0.1:6379> GET user:100:name
+"John Doe"
+
+# Đặt thời gian hết hạn cho key là 30 giây
+127.0.0.1:6379> EXPIRE user:100:name 30
+(integer) 1
+
+# Kiểm tra thời gian sống còn lại (Time To Live) của key
+127.0.0.1:6379> TTL user:100:name
+(integer) 25  # (sẽ giảm dần)
+
+# Xóa một key
+127.0.0.1:6379> DEL user:100:name
+(integer) 1
+
+# Thử lấy lại key đã xóa, kết quả là (nil) - không tồn tại
+127.0.0.1:6379> GET user:100:name
+(nil)
+```
+
+### 5.3. Atomic Operations: MULTI / EXEC
+
+Khi bạn cần thực hiện một chuỗi các lệnh và đảm bảo rằng không có client nào khác có thể xen vào giữa chừng, bạn cần một giao dịch (transaction). Trong Redis, giao dịch được thực hiện bằng cặp lệnh MULTI và EXEC.
+
+- **MULTI:** Bắt đầu một khối giao dịch. Tất cả các lệnh tiếp theo sẽ được xếp vào hàng đợi (queued) thay vì thực thi ngay lập tức.
+- **EXEC:** Thực thi tất cả các lệnh trong hàng đợi một cách nguyên tử.
+- **DISCARD:** Hủy bỏ giao dịch, xóa sạch hàng đợi lệnh.
+
+**Ví dụ với CLI:** Giả sử chúng ta muốn tăng số dư của một người dùng và đồng thời ghi lại một log giao dịch. Chúng ta muốn đảm bảo cả hai việc này đều xảy ra hoặc không có việc nào xảy ra.
+```
+127.0.0.1:6379> SET user:1:balance 1000
+OK
+
+# Bắt đầu giao dịch
+127.0.0.1:6379> MULTI
+OK
+
+# Các lệnh này chỉ được xếp hàng, chưa thực thi
+127.0.0.1:6379> DECRBY user:1:balance 200
+QUEUED
+127.0.0.1:6379> LPUSH user:1:transactions "DEBIT 200"
+QUEUED
+
+# Thực thi tất cả các lệnh trong hàng đợi
+127.0.0.1:6379> EXEC
+1) (integer) 800      # Kết quả của lệnh DECRBY
+2) (integer) 1        # Kết quả của lệnh LPUSH (độ dài mới của list)
+```
+
+Trong `aioredis`, khi bạn sử dụng `pipeline(transaction=True)` (mặc định là True cho hầu hết các phiên bản), nó sẽ tự động bọc các lệnh của bạn trong MULTI và EXEC.
+
+### 5.4. Monitoring cơ bản
+
+Đây là các lệnh bạn thường dùng trong CLI để kiểm tra "sức khỏe" và trạng thái của server Redis.
+
+**INFO:** Cung cấp một lượng lớn thông tin và số liệu thống kê về server. Rất hữu ích để kiểm tra mức sử dụng bộ nhớ, số lượng kết nối, số lệnh đã thực thi, v.v.
+```
+127.0.0.1:6379> INFO memory
+# Memory
+used_memory:1034048
+used_memory_human:1010.00K
+...
+```
+
+**MONITOR:** Đây là một lệnh gỡ lỗi mạnh mẽ, nó sẽ stream trực tiếp tất cả các lệnh mà server Redis nhận được.
+```
+127.0.0.1:6379> MONITOR
+OK
+1667528600.123456 [0 127.0.0.1:54321] "SET" "mykey" "hello"
+1667528605.654321 [0 127.0.0.1:54321] "GET" "mykey"
+```
+
+**Cảnh báo:** Lệnh MONITOR rất tốn tài nguyên và có thể làm giảm hiệu năng của server. Tuyệt đối không sử dụng trên môi trường production trừ khi bạn đang thực sự cần gỡ một lỗi nghiêm trọng.
+
+**FLUSHDB / FLUSHALL:** Các lệnh này dùng để xóa dữ liệu.
+
+- **FLUSHDB:** Xóa tất cả các key trong cơ sở dữ liệu hiện tại bạn đang chọn.
+- **FLUSHALL:** Xóa tất cả các key trong tất cả các cơ sở dữ liệu trên server Redis.
+
+Đây là những lệnh có tính phá hủy cao, thường chỉ được sử dụng trong môi trường phát triển (development) hoặc kiểm thử (testing) để reset trạng thái.
