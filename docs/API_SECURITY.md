@@ -60,7 +60,7 @@ Phân biệt rõ hai khái niệm:
 
 Đây là hình thức xác thực đơn giản nhất được định nghĩa trong đặc tả HTTP.
 
-![basic-authentication](../docs/images/basic-authentication.png)
+![basic-authentication](images/auth/basic_authentication.png)
 
 **Luồng hoạt động**:
 
@@ -105,7 +105,7 @@ Phân biệt rõ hai khái niệm:
 
 Để giải quyết các vấn đề về khả năng mở rộng của xác thực dựa trên session, phương pháp xác thực stateless (phi trạng thái) dựa trên token đã ra đời và trở nên phổ biến, đặc biệt là với sự xuất hiện của JWT.
 
-![token-based-authentication](../docs/images/token-authentication.png)
+![token-based-authentication](images/auth/token_authentication.png)
 
 **Luồng hoạt động (stateless)**:
 
@@ -144,7 +144,7 @@ Một JWT bao gồm ba phần được phân tách bởi dấu chấm `(.)`, m�
 
 OAuth 2.0 là một tiêu chuẩn công nghiệp cho việc ủy quyền. Nó không phải là một giao thức xác thực, mặc dù thường được sử dụng cùng với các giao thức xác thực như OpenID Connect. Mục đích chính của OAuth 2.0 là cho phép một ứng dụng bên thứ ba (client) có quyền truy cập hạn chế vào tài nguyên của người dùng trên một dịch vụ khác (resource server), mà không cần phải chia sẻ thông tin đăng nhập của người dùng.
 
-![oauth](../docs/images/oauth.png)
+![oauth](images/auth/oauth.png)
 
 **Các Grant Types (Luồng cấp phép) chính**:
 
@@ -164,7 +164,7 @@ OAuth 2.0 định nghĩa một số "grant types" cho các trường hợp sử 
 
 ### 1.6. Single Sign-On (SSO)
 **Single Sign-On (SSO)** là một cơ chế cho phép người dùng đăng nhập một lần bằng một bộ thông tin xác thực để truy cập vào nhiều ứng dụng độc lập. **SAML (Security Assertion Markup Language)** là một tiêu chuẩn mở dựa trên XML để trao đổi dữ liệu xác thực và phân quyền giữa các bên.
-![sso](../docs/images/sso.png)
+![sso](images/auth/sso.png)
 
 **Luồng hoạt động của SAML**:
 
