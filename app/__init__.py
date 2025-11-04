@@ -49,6 +49,13 @@ def register_hooks(sanic_app: Sanic):
     # Authentication
     sanic_app.register_middleware(auth, attach_to='request')
 
+
+def register_error_handlers(sanic_app: Sanic):
+    """Imports and registers all custom error handlers for the application."""
+    from app.hooks.error_handler import register_error_handlers as register
+    register(sanic_app)
+
+
 def create_app(*config_cls) -> Sanic:
     logger.info(f"Sanic application initialized with { ', '.join([config.__name__ for config in config_cls]) }")
 
@@ -61,5 +68,6 @@ def create_app(*config_cls) -> Sanic:
     register_listeners(sanic_app)
     register_views(sanic_app)
     register_hooks(sanic_app)
+    register_error_handlers(sanic_app)
 
     return sanic_app
