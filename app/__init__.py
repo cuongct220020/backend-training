@@ -14,7 +14,7 @@ def register_extensions(sanic_app: Sanic):
 
 def register_listeners(sanic_app: Sanic):
     from app.hooks.database import setup_db, close_db
-    from app.hooks.redis import setup_redis, close_redis
+    from app.hooks.caching import setup_redis, close_redis
 
     # Register database hooks
     sanic_app.register_listener(setup_db, "before_server_start")
@@ -33,21 +33,30 @@ def register_views(sanic_app: Sanic):
 def register_hooks(sanic_app: Sanic):
     from app.hooks.request_context import after_request
     from app.hooks.response_time import add_start_time, add_spent_time
-    from app.hooks.database import acquire_db_session, release_db_session
+    from app.hooks.database import manage_db_session
+    from app.hooks.caching import inject_redis_client
     from app.hooks.request_auth import auth
 
-    sanic_app.register_middleware(after_request, attach_to='response')
+    # IMPORTANT: The order of middleware can be important.
+    # Middlewares that wrap the handler are executed like onion layers.
 
-    # Session per-request
-    sanic_app.register_middleware(acquire_db_session, attach_to='request')
-    sanic_app.register_middleware(release_db_session, attach_to='response')
-
-    # Calculate response time
+    # 1. (Outermost) Measures and logs response time
     sanic_app.register_middleware(add_start_time, attach_to='request')
     sanic_app.register_middleware(add_spent_time, attach_to='response')
 
-    # Authentication
+    # 2. Manages DB session lifecycle (commit, rollback, close)
+    # This should wrap the business logic to ensure transactions are handled correctly.
+    sanic_app.register_middleware(manage_db_session)
+
+    # 3. Injects Redis client into the request context
+    sanic_app.register_middleware(inject_redis_client, attach_to='request')
+
+    # 4. Authentication middleware
     sanic_app.register_middleware(auth, attach_to='request')
+
+    # 5. (Innermost) Generic post-request hook
+    sanic_app.register_middleware(after_request, attach_to='response')
+
 
 
 def register_error_handlers(sanic_app: Sanic):

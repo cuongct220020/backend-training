@@ -1,8 +1,7 @@
 # app/hooks/database.py
 from sanic import Sanic, Request
 
-from app.databases.postgresql import postgres_db
-from app.exceptions import ServerError
+from app.databases.postgresql_manager import postgres_db
 
 
 async def setup_db(app: Sanic):
@@ -23,30 +22,12 @@ async def close_db(_app: Sanic):
     await postgres_db.dispose()
 
 
-async def acquire_db_session(request: Request):
+async def manage_db_session(request: Request, handler):
     """
-    Acquires a DB session from the session_maker and attaches it to the request context.
-    This runs before the request handler.
+    Creates a new DB session for a request, handles commit/rollback,
+    and closes it, using a context manager from the PostgreSQLManager.
     """
-    if not postgres_db.session_maker:
-        raise ServerError("Database not initialized. Call setup() first.")
-    request.ctx.db_session = postgres_db.session_maker()
-
-
-async def release_db_session(request: Request, response):
-    """
-    Commits on success, rolls back on failure, and closes the session.
-    This runs after the request handler.
-    """
-    if hasattr(request.ctx, "db_session"):
-        session = request.ctx.db_session
-        try:
-            if response and response.status < 400:
-                await session.commit()
-            else:
-                await session.rollback()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+    async with postgres_db.get_session() as session:
+        request.ctx.db_session = session
+        response = await handler(request)
+    return response

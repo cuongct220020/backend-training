@@ -20,8 +20,8 @@ def main() -> None:
 
     try:
         app.run(**app.config['RUN_SETTING'])
-    except (KeyError, OSError) as e:
-        logger.error(f'Failed to start server: {e}')
+    except (KeyError, OSError) as error:
+        raise error
 
 if __name__ == '__main__':
     main()

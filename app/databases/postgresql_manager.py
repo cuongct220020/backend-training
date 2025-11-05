@@ -18,7 +18,7 @@ logger = get_logger(__name__)
 AsyncSessionMaker: TypeAlias = async_sessionmaker[AsyncSession]
 
 
-class PostgreSQL:
+class PostgreSQLManager:
     """Manages PostgreSQL connection, engine, and sessions."""
 
     def __init__(self) -> None:
@@ -69,4 +69,4 @@ class PostgreSQL:
 
 
 # A single, shared instance for the entire application
-postgres_db = PostgreSQL()
+postgres_db = PostgreSQLManager()
