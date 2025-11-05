@@ -4,7 +4,7 @@ from sanic.response import json
 from sanic.views import HTTPMethodView
 
 from app.decorators.validate_request import validate_request
-from app.decorators.rate_limit import limit_per_user
+from app.decorators.rate_limit_per_user import rate_limit_per_user
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth.login_schema import LoginRequest
 from app.services.auth_service import AuthService
@@ -16,7 +16,7 @@ class LoginView(HTTPMethodView):
     # Decorators are applied from bottom up.
     # 1. @validate_request runs first to validate and attach data.
     # 2. @limit_per_user runs second, using the validated data.
-    @limit_per_user(limit=5, period=300)  # 5 attempts per 5 minutes
+    @rate_limit_per_user(limit=5, period=300)  # 5 attempts per 5 minutes
     @validate_request(LoginRequest)
     async def post(self, request: Request):
         """Handle user login."""

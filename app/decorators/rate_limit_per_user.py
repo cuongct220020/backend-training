@@ -1,4 +1,4 @@
-# app/decorators/rate_limit.py
+# app/decorators/rate_limit_per_user.py
 from functools import wraps
 from sanic.request import Request
 from sanic.response import json
@@ -8,7 +8,7 @@ from app.schemas.response_schema import GenericResponse
 from app.exceptions import TooManyRequests  # Import the custom exception
 
 
-def limit_per_user(limit: int, period: int):
+def rate_limit_per_user(limit: int, period: int):
     """
     A decorator to rate-limit requests based on username and IP address.
     Only increments the counter on failed login attempts (401/403 status codes).
