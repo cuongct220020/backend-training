@@ -34,12 +34,13 @@ async def auth(request: Request):
 async def _verify_and_decode_token(token: str):
     """
     Verify JWT signature, expiration, and optional denylist checks.
+    Ensures the token is an 'access' token.
     """
     if not token:
         raise Unauthorized("JWT token required")
 
-    # Call the verify method on the singleton jwt_handler instance
-    payload = await jwt_handler.verify(token=token)
+    # Explicitly verify that this is an access token
+    payload = await jwt_handler.verify(token=token, token_type="access")
 
     if not payload or "sub" not in payload:
         raise Unauthorized("Invalid JWT payload")

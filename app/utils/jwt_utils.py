@@ -61,15 +61,23 @@ class JWTHandler:
         return access_token, refresh_token, jti, expires_in_minutes
 
     # TOKEN VERIFICATION
-    async def verify(self, token: str) -> dict:
-        """Decode and validate a JWT token using instance configuration."""
+    async def verify(self, token: str, token_type: str = "access") -> dict:
+        """
+        Decode and validate a JWT token using instance configuration.
+        It also verifies the token type ('access' or 'refresh').
+        """
         try:
             payload = jwt.decode(token, self.secret, algorithms=[self.algorithm])
+
+            # --- Security Enhancement: Verify token type ---
+            if payload.get("type") != token_type:
+                raise Unauthorized(f"Invalid token type. Expected '{token_type}'.")
 
             jti = payload.get("jti")
             if not jti:
                 raise Unauthorized("Token missing 'jti' claim")
 
+            # Check if the token has been revoked
             is_denied = await redis_manager.client.get(f"deny_list:jti:{jti}")
             if is_denied:
                 raise Unauthorized("Token has been revoked")
