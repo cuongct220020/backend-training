@@ -31,12 +31,18 @@ def validate_request(schema: Type[BaseSchema]):
             try:
                 validated_data = schema.model_validate(request.json)
                 request.ctx.validated_data = validated_data
-            except ValidationError as e:
+            except ValidationError as error:
+                # Capture the error details
+                error_details = [{"loc": e["loc"], "msg": e["msg"]} for e in error.errors()]
+
                 # Use GenericResponse for a consistent error structure
                 error_response = GenericResponse(
                     status="fail",
                     message=f"Validation error for {schema.__name__}",
-                    return json(error_response.model_dump(exclude_none=True), status=422)
+                    data=error_details
+                )
+
+                return json(error_response.model_dump(exclude_none=True), status=422)
 
             return await func(view, request, *args, **kwargs)
         return decorated_function
