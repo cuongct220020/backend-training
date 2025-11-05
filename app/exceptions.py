@@ -47,6 +47,10 @@ class TooManyRequests(AppException):
     status_code = 429
     quiet = True
 
+    def __init__(self, message: str | None = None, status_code: int | None = None, retry_after: int | None = None):
+        super().__init__(message, status_code)
+        self.retry_after = retry_after
+
 
 # 5xx Server Errors
 class ServerError(AppException):

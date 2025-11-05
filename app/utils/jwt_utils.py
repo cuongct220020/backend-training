@@ -4,6 +4,7 @@ import jwt
 
 from app.databases.redis_manager import redis_manager
 from app.exceptions import Unauthorized
+from config import Config
 
 
 class JWTHandler:
@@ -60,15 +61,10 @@ class JWTHandler:
         return access_token, refresh_token, jti, expires_in_minutes
 
     # TOKEN VERIFICATION
-    @staticmethod
-    async def verify(
-        token: str,
-        secret: str,
-        algorithm: str = "HS256"
-    ) -> dict:
-        """Decode and validate a JWT token."""
+    async def verify(self, token: str) -> dict:
+        """Decode and validate a JWT token using instance configuration."""
         try:
-            payload = jwt.decode(token, secret, algorithms=[algorithm])
+            payload = jwt.decode(token, self.secret, algorithms=[self.algorithm])
 
             jti = payload.get("jti")
             if not jti:
@@ -86,11 +82,7 @@ class JWTHandler:
             raise Unauthorized("Invalid token")
 
     # TOKEN REVOCATION
-    @staticmethod
-    async def revoke(
-        jti: str,
-        exp: datetime
-    ) -> None:
+    async def revoke(self, jti: str, exp: datetime) -> None:
         """Adds a token's JTI to the deny-list until it naturally expires."""
         if not jti or not exp:
             return
@@ -99,3 +91,14 @@ class JWTHandler:
         if ttl > 0:
             key = f"deny_list:jti:{jti}"
             await redis_manager.client.setex(key, ttl, "revoked")
+
+
+# Create a single, configured instance for the entire application
+# This assumes the required JWT settings are present in the Config class.
+jwt_handler = JWTHandler(
+    secret=Config.JWT_SECRET,
+    algorithm=Config.JWT_ALGORITHM,
+    access_exp_minutes=getattr(Config, 'JWT_ACCESS_TOKEN_EXPIRES_MINUTES', 30),
+    refresh_exp_days=getattr(Config, 'JWT_REFRESH_TOKEN_EXPIRES_DAYS', 7)
+)
+

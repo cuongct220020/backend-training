@@ -1,14 +1,12 @@
 from datetime import datetime, UTC
 
-from sanic import Request
-
 from app.databases.redis_manager import redis_manager
 from app.exceptions import Unauthorized
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth.login_schema import LoginRequest
 from app.schemas.auth.token_schema import TokenData
 from app.utils.password_utils import verify_password
-from app.utils.jwt_utils import JWTHandler
+from app.utils.jwt_utils import jwt_handler
 
 
 class AuthService:
@@ -16,7 +14,6 @@ class AuthService:
     @classmethod
     async def login(
         cls,
-        request: Request,
         user_repo: UserRepository,
         login_data: LoginRequest
     ) -> TokenData:
@@ -28,19 +25,12 @@ class AuthService:
             raise Unauthorized("Invalid username or password")
 
         # 2. Create JWT pair
-        jwt_handler = JWTHandler(
-            secret=request.app.config.get("JWT_SECRET"),
-            algorithm=request.app.config.get("JWT_ALGORITHM"),
-            access_exp_minutes=request.app.config.get("ACCESS_TOKEN_EXPIRE_MINUTES", 15),
-            refresh_exp_days=request.app.config.get("REFRESH_TOKEN_EXPIRE_DAYS", 7),
-        )
-
         access_token, refresh_token, jti, expires_in_minutes = jwt_handler.create_tokens(user_id=user.user_id)
 
         # 3. Cache session for revocation tracking
         key = f"user_session:{user.user_id}:{jti}"
         ttl_seconds = expires_in_minutes * 60
-        await redis_manager.setex(key, ttl_seconds, access_token)
+        await redis_manager.setex(key, ttl_seconds, "active")
 
         # 4. Return token DTO
         return TokenData(

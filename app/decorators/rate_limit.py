@@ -5,6 +5,7 @@ from sanic.response import json
 
 from app.databases.redis_manager import redis_manager
 from app.schemas.response_schema import GenericResponse
+from app.exceptions import TooManyRequests  # Import the custom exception
 
 
 def limit_per_user(limit: int, period: int):
@@ -45,13 +46,11 @@ def limit_per_user(limit: int, period: int):
 
             if current_attempts and int(current_attempts) >= limit:
                 retry_after = ttl if ttl is not None and ttl > 0 else period
-                error_response = GenericResponse(
-                    status="fail",
+                # Raise an exception instead of returning a direct response
+                raise TooManyRequests(
                     message=f"Too many failed login attempts. Please try again in {retry_after} seconds.",
-                    data=None
+                    retry_after=retry_after
                 )
-                headers = {"Retry-After": str(retry_after)}
-                return json(error_response.model_dump(exclude_none=True), status=429, headers=headers)
 
             # Proceed to call the actual view function (e.g., login)
             response = await func(view, request, *args, **kwargs)

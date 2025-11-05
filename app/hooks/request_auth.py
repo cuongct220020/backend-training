@@ -1,9 +1,8 @@
-# app/middlewares/auth_middleware.py
+# app/hooks/request_auth.py
 
 from sanic import Request
-from app.utils.security_utils import verify_jwt
-from app.hooks import exceptions
-from config import Config
+from app.utils.jwt_utils import jwt_handler
+from app.exceptions import Unauthorized
 
 
 # --- Middleware entry point ---
@@ -18,7 +17,7 @@ async def auth(request: Request):
     # Extract "Authorization: Bearer <token>"
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
-        raise exceptions.Unauthorized("Missing or invalid Authorization header")
+        raise Unauthorized("Missing or invalid Authorization header")
 
     token = auth_header.split(" ")[1]
     payload = await _verify_and_decode_token(token)
@@ -37,16 +36,13 @@ async def _verify_and_decode_token(token: str):
     Verify JWT signature, expiration, and optional denylist checks.
     """
     if not token:
-        raise exceptions.Unauthorized("JWT token required")
+        raise Unauthorized("JWT token required")
 
-    payload = await verify_jwt(
-        token=token,
-        jwt_secret=Config.JWT_SECRET,
-        jwt_algorithm=Config.JWT_ALGORITHM
-    )
+    # Call the verify method on the singleton jwt_handler instance
+    payload = await jwt_handler.verify(token=token)
 
     if not payload or "sub" not in payload:
-        raise exceptions.Unauthorized("Invalid JWT payload")
+        raise Unauthorized("Invalid JWT payload")
 
     return payload
 
