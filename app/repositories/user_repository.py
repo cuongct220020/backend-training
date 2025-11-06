@@ -1,5 +1,5 @@
 # app/repositories/user_repository.py
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional, Any
 
 from sqlalchemy import select, func, update
@@ -35,11 +35,25 @@ class UserRepository(BaseRepository[User]):
         result = await self.session.execute(stmt.limit(1))
         return result.scalars().first()
 
-    #
-    # The generic get_by_id, create, update, delete, soft_delete, get_many,
-    # and get_paginated methods are all inherited from BaseRepository.
-    # There is no need to redefine them here.
-    #
+    async def activate_user(self, user_id: Any) -> bool:
+        """
+        Activates a user account by setting is_active to True.
+        Returns True if the user was found and activated, False otherwise.
+        """
+        if not hasattr(self.model, 'is_active'):
+            return False
+
+        stmt = (
+            update(self.model)
+            .where(self.model.user_id == user_id)
+            .where(self.model.is_active == False)
+            .values(is_active=True)
+        )
+        result = await self.session.execute(stmt)
+        if result.rowcount > 0:
+            await self.session.flush()
+            return True
+        return False
 
     async def increment_failed_attempts(self, user_id: Any, by: int = 1) -> Optional[int]:
         """
@@ -100,7 +114,7 @@ class UserRepository(BaseRepository[User]):
         if not hasattr(self.model, 'last_login'):
             return
 
-        when = when or datetime.utcnow()
+        when = when or datetime.now(UTC)
         q = update(self.model).where(self.model.user_id == user_id).values(last_login=when, updated_at=func.now()) # Correctly use user_id
         await self.session.execute(q)
         await self.session.flush()

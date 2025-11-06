@@ -2,7 +2,7 @@ from datetime import datetime, UTC, timedelta
 from typing import Any
 import random
 import jwt
-from pydantic import BaseModel as PydanticBase, SecretStr
+from pydantic import BaseModel as PydanticBase, SecretStr, EmailStr
 
 from app.databases.redis_manager import redis_manager
 from app.exceptions import Unauthorized, Forbidden, Conflict, NotFound
@@ -10,15 +10,24 @@ from app.repositories.user_repository import UserRepository
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.otp_repository import OTPRepository
 from app.schemas.auth.login_schema import LoginRequest
-from app.schemas.auth.otp_schema import OTPRequest, OtpAction
+from app.schemas.auth.otp_schema import OTPRequest, OtpAction, OTPVerifyRequest
+from app.schemas.auth.register_schema import RegisterRequest
 from app.schemas.auth.reset_password_schema import ResetPasswordRequest
 from app.schemas.auth.token_schema import TokenData
-from app.schemas.users.user_schema import UserUpdate  # Import UserUpdate schema
+from app.schemas.users.user_schema import UserUpdate
 from app.utils.password_utils import verify_password, hash_password
 from app.utils.jwt_utils import jwt_handler
 from app.services.email_service import email_service
 
-# A private schema for creating refresh token records, as required by BaseRepository.create
+# A private schema for creating user records
+class _UserCreateSchema(PydanticBase):
+    username: EmailStr
+    password: str
+    first_name: str | None = None
+    last_name: str | None = None
+    is_active: bool = False # Users are inactive until email is verified
+
+# A private schema for creating refresh token records
 class _RefreshTokenCreateSchema(PydanticBase):
     jti: str
     user_id: Any
@@ -34,6 +43,37 @@ class _OTPCreateSchema(PydanticBase):
 
 
 class AuthService:
+
+    @classmethod
+    async def register_user(
+        cls,
+        reg_data: RegisterRequest,
+        user_repo: UserRepository,
+        otp_repo: OTPRepository
+    ):
+        """Handles the first step of registration: creating an inactive user and sending a verification OTP."""
+        # 1. Check if user already exists
+        existing_user = await user_repo.get_by_username(reg_data.email)
+        if existing_user:
+            raise Conflict("An account with this email already exists.")
+
+        # 2. Create the user record as inactive
+        hashed_password = hash_password(reg_data.password.get_secret_value())
+        user_create_data = _UserCreateSchema(
+            username=reg_data.email,
+            password=hashed_password,
+            first_name=reg_data.first_name,
+            last_name=reg_data.last_name,
+            is_active=False
+        )
+        await user_repo.create(user_create_data)
+
+        # 3. Trigger the OTP verification email by reusing the request_otp service
+        otp_request_data = OTPRequest(email=reg_data.email, action=OtpAction.REGISTER)
+        # We must call request_otp on the class itself (cls) to ensure it's part of the same transaction
+        await cls.request_otp(otp_request_data, user_repo, otp_repo)
+
+        return
 
     @classmethod
     async def login(
@@ -127,33 +167,28 @@ class AuthService:
         otp_repo: OTPRepository
     ):
         """Handles the business logic for requesting an OTP."""
-        # 1. Business logic validation based on action
-        user = await user_repo.get_by_username(otp_data.email) # Assuming email is used as username
-        if otp_data.action == OtpAction.REGISTER and user:
-            raise Conflict("An account with this email already exists.")
-        if otp_data.action == OtpAction.RESET_PASSWORD and not user:
-            raise NotFound("No account found with this email address.")
+        # This check is now primarily for the RESET_PASSWORD flow.
+        # For REGISTER, the check is done in the register_user service.
+        if otp_data.action == OtpAction.RESET_PASSWORD:
+            user = await user_repo.get_by_username(otp_data.email)
+            if not user:
+                raise NotFound("No account found with this email address.")
 
-        # 2. Invalidate any old, active OTPs for this email and action
         await otp_repo.invalidate_otps_for_email(otp_data.email, otp_data.action)
 
-        # 3. Generate a new OTP
         otp_code = str(random.randint(100000, 999999))
-        expires_at = datetime.now(UTC) + timedelta(minutes=5) # OTP is valid for 5 minutes
+        expires_at = datetime.now(UTC) + timedelta(minutes=5)
 
-        # 4. Store the new OTP in the database
         otp_create_data = _OTPCreateSchema(
             email=otp_data.email,
-            code=hash_password(otp_code), # Always store a hash of the OTP
+            code=hash_password(otp_code),
             action=otp_data.action,
             expires_at=expires_at
         )
         await otp_repo.create(otp_create_data)
 
-        # 5. Send the OTP to the user via the email service
         await email_service.send_otp(email=otp_data.email, otp_code=otp_code, action=otp_data.action)
 
-        # The service layer does not return data for this action, only performs it.
         return
 
     @classmethod
@@ -165,30 +200,40 @@ class AuthService:
         refresh_token_repo: RefreshTokenRepository
     ):
         """Verifies an OTP and resets the user's password."""
-        # 1. Find a matching, active OTP.
-        # We don't know the OTP hash, so we find the latest active one for the email/action.
         active_otp = await otp_repo.get_active_otp(email=data.email, action=OtpAction.RESET_PASSWORD)
 
-        # 2. Verify the provided code against the hashed code in the DB
         if not active_otp or not verify_password(data.otp_code.get_secret_value(), active_otp.code):
             raise Unauthorized("Invalid or expired OTP code.")
 
-        # 3. Mark the OTP as used immediately
         await otp_repo.mark_otp_used(active_otp.id)
 
-        # 4. Find the user to update their password
         user = await user_repo.get_by_username(data.email)
         if not user:
-            # This should not happen if request_otp logic is correct, but as a safeguard:
             raise NotFound("User account not found.")
 
-        # 5. Hash the new password and update the user
         hashed_new_password = hash_password(data.new_password.get_secret_value())
         update_schema = UserUpdate(password=SecretStr(hashed_new_password))
         await user_repo.update(user.user_id, update_schema)
 
-        # 6. Security Best Practice: Log the user out of all other devices
         await refresh_token_repo.revoke_all_for_user(user.user_id)
 
         return
 
+    @classmethod
+    async def verify_registration_otp(cls, data: OTPVerifyRequest, user_repo: UserRepository, otp_repo: OTPRepository):
+        """Verifies an OTP for the registration action and activates the user account."""
+        active_otp = await otp_repo.get_active_otp(email=data.email, action=OtpAction.REGISTER)
+
+        if not active_otp or not verify_password(data.otp_code.get_secret_value(), active_otp.code):
+            raise Unauthorized("Invalid or expired OTP code.")
+
+        await otp_repo.mark_otp_used(active_otp.id)
+
+        user = await user_repo.get_by_username(data.email, include_deleted=True)
+        if not user:
+            raise NotFound("User account not found.")
+
+        if not user.is_active:
+            await user_repo.activate_user(user.user_id)
+
+        return
