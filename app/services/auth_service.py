@@ -1,14 +1,14 @@
+# app/services/auth_service.py
 from datetime import datetime, UTC, timedelta
 from typing import Any
-import random
 import jwt
 from pydantic import BaseModel as PydanticBase, SecretStr, EmailStr
 
 from app.databases.redis_manager import redis_manager
 from app.exceptions import Unauthorized, Forbidden, Conflict, NotFound
+from app.models.user_session import UserSession
 from app.repositories.user_repository import UserRepository
-from app.repositories.refresh_token_repository import RefreshTokenRepository
-from app.repositories.otp_repository import OTPRepository
+from app.repositories.user_session_repository import UserSessionRepository
 from app.schemas.auth.login_schema import LoginRequest
 from app.schemas.auth.otp_schema import OTPRequest, OtpAction, OTPVerifyRequest
 from app.schemas.auth.register_schema import RegisterRequest
@@ -18,6 +18,8 @@ from app.schemas.users.user_schema import UserUpdate
 from app.utils.password_utils import verify_password, hash_password
 from app.utils.jwt_utils import jwt_handler
 from app.services.email_service import email_service
+from app.services.otp_service import otp_service
+
 
 # A private schema for creating user records
 class _UserCreateSchema(PydanticBase):
@@ -25,132 +27,153 @@ class _UserCreateSchema(PydanticBase):
     password: str
     first_name: str | None = None
     last_name: str | None = None
-    is_active: bool = False # Users are inactive until email is verified
-
-# A private schema for creating refresh token records
-class _RefreshTokenCreateSchema(PydanticBase):
-    jti: str
-    user_id: Any
-    expires_at: datetime
-    revoked: bool = False
-
-# A private schema for creating OTP records
-class _OTPCreateSchema(PydanticBase):
-    email: str
-    code: str
-    action: str
-    expires_at: datetime
+    is_active: bool = False  # Users are inactive until email is verified
 
 
 class AuthService:
 
     @classmethod
     async def register_user(
-        cls,
-        reg_data: RegisterRequest,
-        user_repo: UserRepository,
-        otp_repo: OTPRepository
+            cls,
+            reg_data: RegisterRequest,
+            user_repo: UserRepository
     ):
         """Handles the first step of registration: creating an inactive user and sending a verification OTP."""
-        # 1. Check if user already exists
         existing_user = await user_repo.get_by_username(reg_data.email)
-        if existing_user:
+        if existing_user and existing_user.is_active:
             raise Conflict("An account with this email already exists.")
 
-        # 2. Create the user record as inactive
-        hashed_password = hash_password(reg_data.password.get_secret_value())
-        user_create_data = _UserCreateSchema(
-            username=reg_data.email,
-            password=hashed_password,
-            first_name=reg_data.first_name,
-            last_name=reg_data.last_name,
-            is_active=False
-        )
-        await user_repo.create(user_create_data)
+        if not existing_user:
+            hashed_password = hash_password(reg_data.password.get_secret_value())
+            user_create_data = _UserCreateSchema(
+                username=reg_data.email,
+                password=hashed_password,
+                first_name=reg_data.first_name,
+                last_name=reg_data.last_name,
+                is_active=False
+            )
+            await user_repo.create(user_create_data)
 
-        # 3. Trigger the OTP verification email by reusing the request_otp service
+        # Proceed to send OTP for the new or existing inactive user
         otp_request_data = OTPRequest(email=reg_data.email, action=OtpAction.REGISTER)
-        # We must call request_otp on the class itself (cls) to ensure it's part of the same transaction
-        await cls.request_otp(otp_request_data, user_repo, otp_repo)
-
-        return
+        await cls.request_otp(otp_request_data, user_repo)
 
     @classmethod
     async def login(
-        cls,
-        user_repo: UserRepository,
-        login_data: LoginRequest
+            cls,
+            login_data: LoginRequest,
+            user_repo: UserRepository,
+            session_repo: UserSessionRepository,
+            ip_address: str | None,
+            user_agent: str | None
     ) -> TokenData:
-        """Business logic for user login."""
+        """Handles user login, creates tokens, and records the user session in the database."""
         user = await user_repo.get_by_username(login_data.username)
-        if not user or not verify_password(login_data.password, user.password):
+        if not user or not verify_password(login_data.password.get_secret_value(), user.password):
             raise Unauthorized("Invalid username or password")
+
+        if not user.is_active:
+            raise Forbidden("Account is not active. Please verify your email.")
 
         if hasattr(user, 'failed_login_attempts') and user.failed_login_attempts > 0:
             await user_repo.reset_failed_attempts(user.user_id)
-        
+
         await user_repo.update_last_login(user.user_id)
 
-        access_token, refresh_token, jti, expires_in_minutes = jwt_handler.create_tokens(user_id=user.user_id)
+        access_token, refresh_token, access_jti, refresh_jti, expires_in = jwt_handler.create_tokens(
+            user_id=user.user_id, user_role=user.user_role.value)
 
-        key = f"user_session:{user.user_id}:{jti}"
-        ttl_seconds = expires_in_minutes * 60
-        await redis_manager.client.setex(key, ttl_seconds, "active")
+        refresh_payload = jwt.decode(refresh_token, options={"verify_signature": False})
+        refresh_expires_at = datetime.fromtimestamp(refresh_payload.get('exp'), tz=UTC)
+
+        session = UserSession(
+            user_id=user.user_id,
+            jti=refresh_jti,
+            expires_at=refresh_expires_at,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+        await session_repo.create(session)
 
         return TokenData(
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
-            expires_in_minutes=expires_in_minutes,
+            expires_in_minutes=expires_in,
         )
 
     @classmethod
-    async def logout(cls, user_id: str, jti: str, exp: int):
-        """Logs out a user by revoking their token and cleaning up the session record."""
-        if not all([user_id, jti, exp]):
-            return
+    async def logout(cls, session_repo: UserSessionRepository, access_jti: str, access_exp: int,
+                     refresh_token: str | None):
+        """
+        Logs out a user by revoking the access token (in Redis) 
+        and, if provided, the refresh token (in DB).
+        """
+        # 1. Vô hiệu hóa access token trong Redis (bắt buộc)
+        exp_datetime = datetime.fromtimestamp(access_exp, tz=UTC)
+        await jwt_handler.revoke(jti=access_jti, exp=exp_datetime)
 
-        exp_datetime = datetime.fromtimestamp(exp, tz=UTC)
-        await jwt_handler.revoke(jti=jti, exp=exp_datetime)
+        # 2. Vô hiệu hóa refresh token trong DB (nếu nó được cung cấp)
+        if not refresh_token:
+            return  # Không có cookie, không cần làm gì thêm
 
-        session_key = f"user_session:{user_id}:{jti}"
-        await redis_manager.client.delete(session_key)
+        try:
+            # Xác minh token (không kiểm tra blacklist) để lấy jti
+            payload = await jwt_handler.verify(token=refresh_token, token_type="refresh", check_revocation=False)
+            refresh_jti = payload.get("jti")
+            user_id = payload.get("sub")
+
+            session = await session_repo.get_by_jti(refresh_jti)
+            if session and session.user_id == user_id:
+                session.revoked = True
+                await session_repo.session.commit()
+        except (jwt.PyJWTError, Unauthorized, NotFound):
+            # Nếu token không hợp lệ, hết hạn, hoặc không tìm thấy,
+            # chúng ta không cần làm gì cả. Mục tiêu là logout,
+            # và token này đã không thể sử dụng được nữa.
+            pass
 
     @classmethod
     async def refresh_tokens(
-        cls,
-        old_refresh_token: str,
-        refresh_token_repo: RefreshTokenRepository,
-        user_repo: UserRepository
+            cls,
+            old_refresh_token: str,
+            session_repo: UserSessionRepository,
+            user_repo: UserRepository,
+            ip_address: str | None,
+            user_agent: str | None
     ) -> TokenData:
-        """Handles the token refresh and rotation logic for enhanced security."""
-        payload = await jwt_handler.verify(token=old_refresh_token, token_type="refresh")
+        """Handles token refresh and rotation for enhanced security."""
+        try:
+            payload = await jwt_handler.verify(token=old_refresh_token, token_type="refresh")
+        except (jwt.PyJWTError, Unauthorized) as e:
+            raise Unauthorized("Invalid or expired refresh token") from e
+
         user_id = payload.get("sub")
         old_jti = payload.get("jti")
 
-        if await refresh_token_repo.is_revoked(old_jti):
-            await refresh_token_repo.revoke_all_for_user(user_id)
-            raise Forbidden("Compromised refresh token detected. All sessions have been logged out.")
+        session = await session_repo.get_by_jti(old_jti)
 
-        await refresh_token_repo.revoke_by_jti(old_jti)
+        if not session or session.revoked:
+            await session_repo.revoke_all_for_user(user_id)
+            await cls.revoke_all_access_tokens_for_user(user_id)
+            raise Forbidden("Compromised refresh token detected. All sessions have been logged out.")
 
         user = await user_repo.get_by_id(user_id)
         if not user or not user.is_active:
             raise Unauthorized("User account is inactive or not found.")
 
-        access_token, new_refresh_token, new_access_jti, expires_in = jwt_handler.create_tokens(user_id=user.user_id)
+        access_token, new_refresh_token, access_jti, new_refresh_jti, expires_in = jwt_handler.create_tokens(
+            user_id=user.user_id, user_role=user.user_role.value)
 
         new_refresh_payload = jwt.decode(new_refresh_token, options={"verify_signature": False})
-        token_create_data = _RefreshTokenCreateSchema(
-            jti=new_refresh_payload.get('jti'),
-            user_id=user_id,
-            expires_at=datetime.fromtimestamp(new_refresh_payload.get('exp'), tz=UTC)
-        )
-        await refresh_token_repo.create(token_create_data)
+        new_expires_at = datetime.fromtimestamp(new_refresh_payload.get('exp'), tz=UTC)
 
-        session_key = f"user_session:{user.user_id}:{new_access_jti}"
-        ttl_seconds = expires_in * 60
-        await redis_manager.client.setex(session_key, ttl_seconds, "active")
+        session.jti = new_refresh_jti
+        session.expires_at = new_expires_at
+        session.last_active = datetime.now(UTC)
+        session.ip_address = ip_address
+        session.user_agent = user_agent
+        await session_repo.session.commit()
 
         return TokenData(
             access_token=access_token,
@@ -161,73 +184,58 @@ class AuthService:
 
     @classmethod
     async def request_otp(
-        cls,
-        otp_data: OTPRequest,
-        user_repo: UserRepository,
-        otp_repo: OTPRepository
+            cls,
+            otp_data: OTPRequest,
+            user_repo: UserRepository
     ):
-        """Handles the business logic for requesting an OTP."""
-        # This check is now primarily for the RESET_PASSWORD flow.
-        # For REGISTER, the check is done in the register_user service.
+        """Handles the business logic for requesting an OTP using Redis."""
         if otp_data.action == OtpAction.RESET_PASSWORD:
             user = await user_repo.get_by_username(otp_data.email)
             if not user:
                 raise NotFound("No account found with this email address.")
 
-        await otp_repo.invalidate_otps_for_email(otp_data.email, otp_data.action)
-
-        otp_code = str(random.randint(100000, 999999))
-        expires_at = datetime.now(UTC) + timedelta(minutes=5)
-
-        otp_create_data = _OTPCreateSchema(
-            email=otp_data.email,
-            code=hash_password(otp_code),
-            action=otp_data.action,
-            expires_at=expires_at
-        )
-        await otp_repo.create(otp_create_data)
-
+        otp_code = await otp_service.generate_and_store_otp(otp_data.email, otp_data.action.value)
         await email_service.send_otp(email=otp_data.email, otp_code=otp_code, action=otp_data.action)
-
-        return
 
     @classmethod
     async def reset_password_with_otp(
-        cls,
-        data: ResetPasswordRequest,
-        user_repo: UserRepository,
-        otp_repo: OTPRepository,
-        refresh_token_repo: RefreshTokenRepository
+            cls,
+            data: ResetPasswordRequest,
+            user_repo: UserRepository,
+            session_repo: UserSessionRepository
     ):
-        """Verifies an OTP and resets the user's password."""
-        active_otp = await otp_repo.get_active_otp(email=data.email, action=OtpAction.RESET_PASSWORD)
+        """Verifies OTP from Redis, resets password, and revokes all sessions."""
+        is_valid = await otp_service.verify_otp(
+            email=data.email,
+            action=OtpAction.RESET_PASSWORD.value,
+            submitted_code=data.otp_code.get_secret_value()
+        )
 
-        if not active_otp or not verify_password(data.otp_code.get_secret_value(), active_otp.code):
+        if not is_valid:
             raise Unauthorized("Invalid or expired OTP code.")
 
-        await otp_repo.mark_otp_used(active_otp.id)
-
         user = await user_repo.get_by_username(data.email)
-        if not user:
+        if not user:  # Should not happen if request_otp check passed, but good practice
             raise NotFound("User account not found.")
 
         hashed_new_password = hash_password(data.new_password.get_secret_value())
         update_schema = UserUpdate(password=SecretStr(hashed_new_password))
         await user_repo.update(user.user_id, update_schema)
 
-        await refresh_token_repo.revoke_all_for_user(user.user_id)
-
-        return
+        await session_repo.revoke_all_for_user(user.user_id)
+        await cls.revoke_all_access_tokens_for_user(user.user_id)
 
     @classmethod
-    async def verify_registration_otp(cls, data: OTPVerifyRequest, user_repo: UserRepository, otp_repo: OTPRepository):
-        """Verifies an OTP for the registration action and activates the user account."""
-        active_otp = await otp_repo.get_active_otp(email=data.email, action=OtpAction.REGISTER)
+    async def verify_registration_otp(cls, data: OTPVerifyRequest, user_repo: UserRepository):
+        """Verifies an OTP from Redis for registration and activates the user account."""
+        is_valid = await otp_service.verify_otp(
+            email=data.email,
+            action=OtpAction.REGISTER.value,
+            submitted_code=data.otp_code.get_secret_value()
+        )
 
-        if not active_otp or not verify_password(data.otp_code.get_secret_value(), active_otp.code):
+        if not is_valid:
             raise Unauthorized("Invalid or expired OTP code.")
-
-        await otp_repo.mark_otp_used(active_otp.id)
 
         user = await user_repo.get_by_username(data.email, include_deleted=True)
         if not user:
@@ -236,4 +244,8 @@ class AuthService:
         if not user.is_active:
             await user_repo.activate_user(user.user_id)
 
-        return
+    @classmethod
+    async def revoke_all_access_tokens_for_user(cls, user_id: Any):
+        """Instantly invalidates all access tokens for a user by setting a revocation timestamp in Redis."""
+        key = f"user_revoke_all_timestamp:{user_id}"
+        await redis_manager.client.set(key, int(datetime.now(UTC).timestamp()), ex=timedelta(days=31))
