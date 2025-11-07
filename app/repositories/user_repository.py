@@ -4,9 +4,12 @@ from typing import Optional, Any
 
 from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert
 
 from app.models.user import User
+from app.models.address import Address
 from app.repositories import BaseRepository
+from app.schemas.users.user_schema import ProfileUpdateSchema, AddressUpdateSchema
 
 
 class UserRepository(BaseRepository[User]):
@@ -118,3 +121,38 @@ class UserRepository(BaseRepository[User]):
         q = update(self.model).where(self.model.user_id == user_id).values(last_login=when, updated_at=func.now()) # Correctly use user_id
         await self.session.execute(q)
         await self.session.flush()
+
+
+    async def update_user_profile(self, user_id: Any, profile_data: ProfileUpdateSchema) -> Optional[User]:
+        """
+        Updates a user's profile and their associated address.
+        """
+        user = await self.get_by_id(user_id)
+        if not user:
+            return None
+
+        # Update user's direct fields
+        update_values = profile_data.model_dump(exclude_unset=True, exclude={'address'})
+        if update_values:
+            q = update(User).where(User.user_id == user_id).values(**update_values, updated_at=func.now())
+            await self.session.execute(q)
+
+        # Handle address update
+        if profile_data.address:
+            address_data = profile_data.address.model_dump(exclude_unset=True)
+            if address_data:
+                # Check if user already has an address
+                if user.address_id:
+                    # Update existing address
+                    q = update(Address).where(Address.address_id == user.address_id).values(**address_data, updated_at=func.now())
+                    await self.session.execute(q)
+                else:
+                    # Create new address and link to user
+                    insert_stmt = insert(Address).values(**address_data).returning(Address.address_id)
+                    result = await self.session.execute(insert_stmt)
+                    new_address_id = result.scalar_one()
+                    await self.session.execute(update(User).where(User.user_id == user_id).values(address_id=new_address_id, updated_at=func.now()))
+        
+        await self.session.flush()
+        await self.session.refresh(user)
+        return user

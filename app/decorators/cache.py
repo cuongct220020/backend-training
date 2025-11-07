@@ -4,7 +4,7 @@ from typing import Callable, Any, Type
 
 from pydantic import BaseModel
 
-from app.extensions import redis_manager
+from app.databases.redis_manager import redis_manager
 from app.utils.logger_utils import get_logger
 
 logger = get_logger(__name__)
@@ -42,7 +42,7 @@ def cache(
     """
     def decorator(func: Callable):
         @wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any):
+        async def decorated_function(*args: Any, **kwargs: Any):
             cache_key = _generate_cache_key(prefix, func, *args, **kwargs)
             redis_client = redis_manager.client
 
@@ -72,5 +72,5 @@ def cache(
 
             return result
 
-        return wrapper
+        return decorated_function
     return decorator

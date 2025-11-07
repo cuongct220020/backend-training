@@ -59,11 +59,30 @@ class UserCreate(UserBase):
         return value
 
 
+class AddressUpdateSchema(BaseSchema):
+    """Schema for updating address information."""
+    street_address: str | None = Field(None, max_length=100)
+    city: str | None = Field(None, max_length=50)
+    state: str | None = Field(None, max_length=50)
+    postal_code: str | None = Field(None, max_length=20)
+    country: str | None = Field(None, max_length=50)
+
+
+class ProfileUpdateSchema(BaseSchema):
+    """Schema for updating user profile information."""
+    first_name: str | None = Field(None, max_length=50)
+    last_name: str | None = Field(None, max_length=50)
+    phone_number: str | None = Field(None, max_length=20)
+    date_of_birth: str | None = None  # Consider using date type if possible
+    address: AddressUpdateSchema | None = None
+
+
 class UserUpdate(BaseSchema):
     """Schema for updating a user. All fields are optional."""
     username: str | None = Field(None, min_length=3, max_length=50)
     password: SecretStr | None = None
     is_active: bool | None = None
+    profile: ProfileUpdateSchema | None = None
 
 
 class UserRead(UserBase):

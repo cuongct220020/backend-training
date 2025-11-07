@@ -4,34 +4,64 @@ from sanic.response import json
 from sanic.views import HTTPMethodView
 
 from app.decorators.validate_request import validate_request
-from app.decorators.rate_limit_per_user import rate_limit_per_user
 from app.repositories.user_repository import UserRepository
+from app.repositories.user_session_repository import UserSessionRepository
+from app.schemas.access_token_schema import AccessTokenResponse
 from app.schemas.auth.login_schema import LoginRequest
 from app.services.auth_service import AuthService
 from app.schemas.response_schema import GenericResponse
+from app.schemas.auth.token_schema import TokenData
 
 
 class LoginView(HTTPMethodView):
+    decorators = [validate_request(LoginRequest)]
 
-    # Decorators are applied from bottom up.
-    # 1. @validate_request runs first to validate and attach data.
-    # 2. @limit_per_user runs second, using the validated data.
-    @rate_limit_per_user(limit=5, period=300)  # 5 attempts per 5 minutes
-    @validate_request(LoginRequest)
     async def post(self, request: Request):
-        """Handle user login."""
-        login_data = request.ctx.validated_data
+        """Handles user login and token generation."""
+        validated_data = request.ctx.validated_data
+        config = request.app.config
+
+        # Instantiate required repositories with the request's DB session
         user_repo = UserRepository(session=request.ctx.db_session)
+        session_repo = UserSessionRepository(session=request.ctx.db_session)
 
-        # The view's responsibility is to call the service and format the response.
-        # Exception handling is delegated to the global error handler.
-        token_dto = await AuthService.login(user_repo, login_data)
+        # Get request metadata
+        ip_address = request.ip
+        user_agent = request.headers.get("User-Agent")
 
-        response = GenericResponse(
-            status="success",
-            message="Login successful",
-            data=token_dto
+        token_dto: TokenData = await AuthService.login(
+            login_data=validated_data,
+            user_repo=user_repo,
+            session_repo=session_repo,
+            ip_address=ip_address,
+            user_agent=user_agent
         )
 
-        # Use by_alias=True to respect camelCase aliases in the response
-        return json(response.model_dump(by_alias=True), status=200)
+        # 1. Chuẩn bị dữ liệu JSON chỉ chứa access token
+        access_token_data = AccessTokenResponse(
+            access_token=token_dto.access_token,
+            token_type=token_dto.token_type,
+            expires_in_minutes=token_dto.expires_in_minutes,
+        )
+
+        response_data = GenericResponse(
+            status="success",
+            message="Login successful",
+            data=access_token_data
+        )
+        response = json(response_data.model_dump(by_alias=True), status=200)
+
+        # 2. Đặt refresh token vào một HttpOnly cookie
+        refresh_expires_days = int(config.get("REFRESH_TOKEN_EXPIRE_DAYS", 7))
+        max_age = refresh_expires_days * 24 * 60 * 60  # Tính bằng giây
+
+        response.set_cookie(
+            "refresh_token",
+            token_dto.refresh_token,
+            max_age=max_age,
+            httponly=True,
+            secure=not config.get("DEBUG", False),  # Chỉ gửi qua HTTPS khi không ở chế độ DEBUG
+            samesite="Strict"  # Ngăn chặn CSRF
+        )
+
+        return response

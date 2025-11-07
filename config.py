@@ -45,3 +45,10 @@ class RedisConfig:
     REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
     REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
     REDIS_DB = int(os.getenv('REDIS_DB', 0))
+
+class EmailConfig:
+    # Email server configuration (for Gmail)
+    EMAIL_HOST = "smtp.gmail.com"
+    EMAIL_PORT = 587  # Port for TLS
+    EMAIL_SENDER = os.getenv("EMAIL_SENDER")  # Your Gmail address, e.g., "your.email@gmail.com"
+    EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")  # The 16-character App Password you generated

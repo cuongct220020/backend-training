@@ -3,37 +3,69 @@ from sanic.request import Request
 from sanic.response import json
 from sanic.views import HTTPMethodView
 
-from app.decorators.validate_request import validate_request
-from app.schemas.auth.refresh_schema import RefreshRequest
+from app.exceptions import Unauthorized
 from app.services.auth_service import AuthService
 from app.schemas.response_schema import GenericResponse
 from app.repositories.user_repository import UserRepository
-from app.repositories.refresh_token_repository import RefreshTokenRepository
+from app.repositories.user_session_repository import UserSessionRepository
+from app.schemas.auth.token_schema import TokenData
 
 
 class RefreshView(HTTPMethodView):
-
-    @validate_request(RefreshRequest)
+    # Không cần @validate_request vì chúng ta không đọc body
     async def post(self, request: Request):
         """
-        Handles token refresh using a valid refresh token.
+        Handles token refresh using a valid refresh token from an HttpOnly cookie.
         Implements token rotation for enhanced security.
         """
-        validated_data = request.ctx.validated_data
+        # 1. Đọc refresh token từ cookie
+        old_refresh_token = request.cookies.get("refresh_token")
+        if not old_refresh_token:
+            raise Unauthorized("Missing refresh token cookie.")
 
-        # Instantiate required repositories with the request's DB session
+        config = request.app.config
+
+        # Instantiate required repositories
         user_repo = UserRepository(session=request.ctx.db_session)
-        refresh_token_repo = RefreshTokenRepository(session=request.ctx.db_session)
+        session_repo = UserSessionRepository(session=request.ctx.db_session)
 
-        new_token_dto = await AuthService.refresh_tokens(
-            old_refresh_token=validated_data.refresh_token,
-            refresh_token_repo=refresh_token_repo,
-            user_repo=user_repo
+        # Get request metadata
+        ip_address = request.ip
+        user_agent = request.headers.get("User-Agent")
+
+        # 2. Gọi service với token từ cookie
+        new_token_dto: TokenData = await AuthService.refresh_tokens(
+            old_refresh_token=old_refresh_token,
+            session_repo=session_repo,
+            user_repo=user_repo,
+            ip_address=ip_address,
+            user_agent=user_agent
         )
 
-        response = GenericResponse(
+        # 3. Chuẩn bị response chỉ chứa access token mới
+        access_token_data = {
+            "access_token": new_token_dto.access_token,
+            "token_type": new_token_dto.token_type,
+            "expires_in_minutes": new_token_dto.expires_in_minutes
+        }
+        response_data = GenericResponse(
             status="success",
             message="Tokens refreshed successfully",
-            data=new_token_dto
+            data=access_token_data
         )
-        return json(response.model_dump(by_alias=True), status=200)
+        response = json(response_data.model_dump(by_alias=True), status=200)
+
+        # 4. Đặt refresh token MỚI (đã được xoay vòng) vào cookie
+        refresh_expires_days = int(config.get("REFRESH_TOKEN_EXPIRE_DAYS", 7))
+        max_age = refresh_expires_days * 24 * 60 * 60
+
+        response.set_cookie(
+            "refresh_token",
+            new_token_dto.refresh_token,
+            max_age=max_age,
+            httponly=True,
+            secure=not config.get("DEBUG", False),
+            samesite="Strict"
+        )
+
+        return response
