@@ -570,7 +570,6 @@ Bằng cách cấu hình `storage_ttl` (thời gian lưu cache cũ, ví dụ: 1 
 nếu nó không thể kết nối đến backend. Việc phục vụ dữ liệu cũ vẫn tốt hơn nhiều so với việc trả về 
 lỗi 503 cho người dùng. 
 
-
 ## Phần 8. Tích hợp Service Discovery và Observability (Khả năng quan sát)
 
 Trong một hệ thống microservices, các service là động (dynamic); chúng đến và đi. 
@@ -598,22 +597,116 @@ Khi một `Pod` được thêm/bớt, KIC nhận được sự kiện ngay lập
 
 ### 8.2. Chiến lược Logging: Tích hợp với ELK Stack và Grafana Loki
 
+Kong cung cấp nhiều plugin logging (như `file-log`, `tcp-log`, `http-log`) 
+để gửi dữ liệu log request/response đến các hệ thống bên ngoài. 
+* **Tích hợp ELK Stack:** Sử dụng plugin `tcp-log` hoặc `http-log` để gửi log
+(đã được định nghĩa JSON) trực tiếp đến Logstash hoặc một HTTP endpoint của Elasticsearch. 
+* **Tích hợp Grafana Loki:** Loki (thường dùng với Promtail) là một lựa chọn phổ biến, tối ưu chi phí. 
+Tuy nhiên, Loki yêu cầu một định dạng log JSON rất cụ thể. Bạn phải sử dụng plugin `http-log` và cấu hình
+trường `custome_fields_by_lua` để định dạng lại log của Kong cho phù hợp với Loki. 
+
+Cấu hình mẫu `http-log` cho Loki (Best practice): Đây là một cấu hình mẫu `custome_field_by_lua`
+đã dược chứng minh là hoạt động, giúp trích xuất các thông tin quan trọng và tạo ra các `steam` (luồng) cho Loki: 
+```Lua
+-- Cấu hình trong plugin http-log, trường config.custom_fields_by_lua
+"local ts=string.format('%18.0f', os.time()*1000000000) local log_payload = kong.log.serialize() local service = log_payload['service'] local response = log_payload['response'] local latencies = log_payload['latencies'] local t = { {stream = {gateway='total-latency', service=service['name']}, values={{ts, 'ip='..log_payload['client_ip']..' duration='..latencies['request']..'ms upstream_uri='..log_payload['upstream_uri']..' status='..response['status']}}} } return t"
+```
+
+(Đoạn mã đầy đủ hơn có thể được tìm thấy trong tài liệu , bao gồm cả `upstream-latency` và `gateway-latency`).
 
 ### 8.3. Giám sát (Monitoring): Thiết lập Prometheus và Grafana
 
+Đây là trụ cột quan trọng của observability. Kong không có expose endpoint `/metrics`
+theo chuẩn Prometheus một cách native. Bạn phải bật nó thông qua plugin `prometheus`. 
+Plugin này (viết bằng Lua) sẽ tính toán các metrics (như `kong_http_status`, `kong_latency_ms`,
+`kong_bandwidth_bytes`) từ bên trong Nginx worker và tạo ra endpoint `/metrics`. 
+
+Lộ trình thiết lập K8s/KIC (Best Practice):
+1. **Cài đặt Prometheus/Grafana:** Cài đặt `kube-prometheus-stack` Helm chart. 
+Nó sẽ tự động tìm kiếm các `ServiceMonitor` resources.
+2. **Cài đặt KIC:** Khi cài đặt KIC Helm chart, bật tùy chọn `gateway.serviceMonitor.enabled=true`. Thao tác này sẽ tự động tạo K8s `ServiceMonitor` resource mà Prometheus đang tìm kiếm.
+3. **Bật Plugin:** Áp dụng một `KongClusterPlugin` để bật plugin `prometheus` trên toàn cụm (globally).
+
+```YAML
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: prometheus-global
+  labels:
+    global: "true" # Áp dụng cho mọi service
+plugin: prometheus
+```
+4. **Hoàn tất:** Prometheus sẽ tự động phát hiện `ServiceMonitor`, bắt đầu scrape (thu thập) metrics từ endpoint `/metrics` của Kong.
+5. **Dashboard:** Mở Grafana, import dashboard chính thức của Kong (ID: 7424) để có một giao diện giám sát hoàn chỉnh. 
 
 ### 8.4. Truy vết phân tán (Distributed Tracing): OpenTelemetry và Jaeger
 
+Trong microservices, một request (ví dụ: "đặt hàng") có thể đi qua 5-10 service khác nhau (auth -> order -> payment -> notification). 
+Distributed Tracing giúp bạn theo dõi toàn bộ hành trình đó.
+
+Kong hỗ trợ `zipkin` (tương thích với Jaeger) và `opentelemetry` (OTel). **Otel là tiêu chuẩn mới và là best practice.**
+
+Lộ tình thiết lập Otel/Jaeger:
+1. **Cài đặt Backend:** Triển khai một OTel Collector và một backend (như Jaeger hoặc Last9).
+2. **Bật Plugin:** Áp dụng plugin `opentelemetry` cho Kong (thường là global)
+3. Cấu hình plugin:
+   * `config.traces_endpoint:` Đặt giá trị này trỏ đến OTel Collector của bạn 
+(ví dụ: `http://otel-collector.monitoring.svc:4318/v1/traces`).
+   * `config.propagation.inject:` Đảm bảo w3c (traceparent) hoặc jaeger được bao gồm.
 
 ## Phần 9. Vận hành Production: High Availability (HA) và tinh chỉnh hiệu năng
 ### 9.1. Kiến trúc High Availability (HA) được khuyến nghị
 
+Để chạy Kong trong production, bạn không thể chạy một node duy nhất; 
+điều đó tạo ra một Điểm lỗi Đơn (Single Point of Failure - SPoF).
+
+Kiến trúc HA cho Kong yêu cầu :   
+
+1. Triển khai nhiều node Kong (ít nhất là 3 node).
+
+2. Một Load Balancer (như NGINX, HAProxy, K8s Service) đặt phía trước các node Kong này để phân phối traffic.
+
+3. Các node Kong này phải chia sẻ trạng thái (shared state) để chúng hoạt động nhất quán. 
+
+Cách chúng chia sẻ trạng thái phụ thuộc vào mô hình triển khai của bạn: 
+* **Kịch bản DB-backed:** Trạng thái được chia sẻ trong database. 
+Bạn phải đảm bảo HA cho 2 thứ: (1) Cụm Kong (N nodes + LB) và (2) Cụm Database (ví dụ: Postgres HA với replication). Đây là một thiết lập phức tạp.
+* **Kịch bản DB-less:** Trạng thái được chia sẻ qua file `kong.yml`. Các node là hoàn toàn steteless. Bạn chỉ cần đảm bảo HA cho 1 thứ: (1) Cụm Kong (N nodes + LB). 
+
+**Best Practice (K8s):** Cách đơn giản và mạnh mẽ nhất để đạt được HA là chạy Kong ở chế độ DB-less bên trong một Kubernetes `Deployment` với `replicas: 3` 
+và expose nó qua một K8s `Service` (Loại LoadBalancer). Kubernetes sẽ tự động xử lý HA, rolling updates, và load balancing cho các pod Kong stateless.
 
 ### 9.2. Chiến lược mở rộng (Scaling): Horizontal vs. Vertical
 
+Kong có thể scale theo cả hai chiều:
+
+* **Vertical Scaling (Mở rộng Dọc):** Tăng CPU/RAM cho một node. Cách này đơn giản nhưng có giới hạn vật lý và tốn kém.
+
+* **Horizontal Scaling (Mở rộng Ngang):** Thêm nhiều node Kong vào cụm. Đây là phương pháp cloud-native, mang lại HA và khả năng mở rộng gần như vô hạn.
+
+Kong được thiết kế để scale horizontally. Bạn chỉ cần thêm các node (hoặc pod) vào cụm.
+
+Một phân tích quan trọng khi lập kế hoạch resource (CPU/RAM) cho Kong:
+
+**Throughput (RPS - Request Per Second) bị giới hạn bởi CPU (CPU-bound)**. Logic proxy (Nginx) và LuaJIT (OpenResty) rất hiệu quả về CPU. Nếu bạn cần xử lý nhiều request/giây hơn, hãy thêm nhiều node Kong (horizontal) hoặc thêm CPU cho các node hiện tại (vertical).
+
+**Latency (ms - Độ trễ) bị giới hạn bởi Memory (Memory-bound)**. Nếu mỗi request bị chậm, đó là do Kong (Lua) đang phải thực hiện nhiều logic (ví dụ: chạy 10 plugin phức tạp, khớp với 5000 routes). Thêm RAM cho phép Kong cache nhiều cấu hình hơn trong bộ nhớ (sử dụng LMDB), giảm thời gian tra cứu và giảm độ trễ.
 
 ### 9.3. Tinh chỉnh hiệu năng: Tối ưu hoá Nginx Workers và `ulimit`
 
+Đây là lúc kiến thức Nginx của bạn phát huy tác dụng. Để đạt hiệu suất tối đa, bạn cần tinh chỉnh một vài tham số:
+
+* `ulimit:` Đảm bảo giới hạn file descriptor (số lượng file mở) của hệ điều hành đủ cao, ví dụ: `ulimit -n 65536`. Nếu không, Kong sẽ bị lỗi "too many open files" dưới tải cao.
+
+* `worker_connections:` Trong cấu hình Nginx của Kong, tăng giá trị này (ví dụ: `4096` hoặc cao hơn) để cho phép mỗi Nginx worker xử lý nhiều kết nối đồng thời.
+
+* `nginx_worker_processes:` Đây là tham số quan trọng nhất.
+
+**Một cái bẫy chết người trong K8s (Critical Trap):** Nhiều người đặt `KONG_NGINX_WORKER_PROCESSES=auto`. Trong một container, `auto` thường phân giải thành số lượng CPU core của Node (máy chủ K8s) chứ không phải Pod. 
+Hãy tưởng tượng K8s Node của bạn có 64 CPU, nhưng bạn chỉ cấp `limits.cpu: "2"` cho pod Kong. Kong sẽ khởi động 64 Nginx worker, tất cả 64 worker này sẽ tranh giành 2 CPU mà bạn đã cấp, gây ra context switching liên tục và hiệu năng thảm họa.
+
+**Best Practice (K8s):** Luôn luôn set cứng CPU `requests` và `limits` cho pod Kong của bạn (ví dụ: `limits: { cpu: "4" }`). 
+Sau đó, set cứng số lượng worker để khớp với giới hạn đó: `env: { "KONG_NGINX_WORKER_PROCESSES": "4" }.` Việc đảm bảo tỷ lệ 1:1 giữa worker và CPU được cấp phát là tối quan trọng để đạt được hiệu suất tối đa.
 
 ## Phần 10. Lộ trình và danh sách kiểm tra (roadmap & checklist)
 ### 10.1. Danh sách kiểm tra (checklist) triển khai từ zero đến production
@@ -694,10 +787,18 @@ Báo cáo này đã bao gồm rất nhiều thông tin. Dưới đây là một 
 
 ### 10.2. Quản lý vòng đời API (API Lifecycle Management) và Best Practices
 
+Cuối cùng, Kong không chỉ là một proxy; nó là một công cụ quản lý vòng đời API. 
+* **Quản lý phiên bản (versioning):** Kong giúp bạn quản lý nhiều phiên bản của API cùng một lúc một cách mượt mà. 
+  * `Route 1:` `paths: ["/v1/orders"]` -> `Service: order-v1`
+  * `Route 2:` `paths: ["/v2/orders"]` -> `Service: order-v2`. 
+Bạn có thể sử dụng các mẫu hình như Canary (phần 7.3) để chuyển dần traffic từ v1 sang v2. 
 
+* **Quản trị (Governance):** Kong là nơi bạn quản trị các chính sách quản trị tập trung. 
+Ví dụ: "Tất cả các API public phải có rate-limiting và xác thực JWT." Bạn có thể thực thi điều này
+bằng cách áp dụng các plugin `jwt` và `rate-limiting` ở phạm vi Global hoặc trên toàn bộ `Service`.
 
-
-
+* **Tài liệu hoá (Documentation):** Kong tích hợp chặt chẽ với các cổng thông tin developer (Developer Portal), 
+cho phép tự động hoá việc tạo tài liệu API cho các developer bên ngoài, dựa trên chính các cấu hình `Service` và `Route` mà bạn đã định nghĩa.   
 
 ## Kết luận
 
