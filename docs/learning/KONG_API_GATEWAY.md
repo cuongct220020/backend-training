@@ -557,20 +557,60 @@ Kong làm cho việc triển khai các chiến lược này trở nên dễ dàn
 
 ### 7.4. Caching: Tăng tốc phản hồi với Proxy Cache Plugin
 
+Plugin `Proxy-cache` là một công cụ mạnh mẽ để cải thiện hiểu suất và độ tin cậy.
+Nó có thể cache các phản hồi (responses) trong bộ nhớ (mặc định) hoặc trong một data store
+bên ngoài như Redis. 
+* **Cấu hình:** Bạn có thể cấu hình plugin để chỉ cache các request `GET` trả về `200 OK` và 
+lưu chúng trong một `cache_ttl` (Time-To-Live) cụ thể (ví dụ: 300 giây). 
+* **Lợi ích hiệu suất:** Giảm tải cho các microservices backend của bạn. 
+* **Lợi ích độ tin cậy (resilience):** Đây là một lợi ích quan trọng thường bị bỏ qua. 
+Plugin này hỗ trợ phục vụ cache cũ (stale cache) khi "upstream outages" (dịch vụ backend bị lỗi).
+Bằng cách cấu hình `storage_ttl` (thời gian lưu cache cũ, ví dụ: 1 giờ) cao hơn `cache_tll`
+(thời gian cache mới, ví dụ: 5 phút), Kong có thể được trả về dữ liệu cũ (stale) 
+nếu nó không thể kết nối đến backend. Việc phục vụ dữ liệu cũ vẫn tốt hơn nhiều so với việc trả về 
+lỗi 503 cho người dùng. 
+
 
 ## Phần 8. Tích hợp Service Discovery và Observability (Khả năng quan sát)
+
+Trong một hệ thống microservices, các service là động (dynamic); chúng đến và đi. 
+Khả năng quan sát (Observability), bao gồm: Logging, Monitoring và Tracing là không thể thiếu. 
+
 ### 8.1. Tự động hoá phát hiện dịch vụ (Service Discovery)
+
+Kong phải biết địa chỉ IP của các microservices của bạn. Việc hardcode IP là không thể. 
+Kong hỗ trợ nhiều cơ chế service discovery. 
+* Tích hợp Consul: 
+  * Bạn cấu hình file `kong.conf` để sử dụng DNS resolver của Consul (ví dụ: `dns_resolver = 127.0.0.1:8600`).
+  * Sau đó, bạn chỉ cần đặt `host` của Kong `Service` thành tên DNS của service trong Consul
+(ví dụ: `my-service.service.consul`). Kong sẽ tự động nhận được các IP đăng ký. 
+
+* Kubernetes DNS / SRV:
+  * Đây là cách mặc định trong K8s. Bạn đặt host của Kong Service thành tên K8s Service (ví dụ: `my-service.my-namespace.svc.cluster.local`). Kong sẽ sử dụng CoreDNS của K8s để phân giải.
+  * Nếu K8s Service là headless (không có ClusterIP), Kong có thể được cấu hình để truy vấn bản ghi SRV (SRV records) , cho phép nó lấy danh sách IP của tất cả các Pod backend thay vì chỉ một IP ảo.
+
+* **Kubernetes KIC (Best Practices)**:
+  * Cả hai phương pháp đều dựa vào DNS, vốn có thể bị trễ do caching (DNS TTL).
+  * Như đã đề cập ở 4.2 và 4.3, Kong Ingress Controller (KIC) là cơ chế tốt nhất. KIC không dựa vào DNS. 
+Nó theo dõi (watches) trực tiếp K8s API (cụ thể là các `Endpoints` objects). 
+Khi một `Pod` được thêm/bớt, KIC nhận được sự kiện ngay lập tức và chủ động cập nhật danh sách `Targets` trong `Upstream` của Kong. 
+Đây là cơ chế service discovery tức thời và đáng tin cậy nhất trong K8s.
 
 ### 8.2. Chiến lược Logging: Tích hợp với ELK Stack và Grafana Loki
 
+
 ### 8.3. Giám sát (Monitoring): Thiết lập Prometheus và Grafana
 
+
 ### 8.4. Truy vết phân tán (Distributed Tracing): OpenTelemetry và Jaeger
+
 
 ## Phần 9. Vận hành Production: High Availability (HA) và tinh chỉnh hiệu năng
 ### 9.1. Kiến trúc High Availability (HA) được khuyến nghị
 
+
 ### 9.2. Chiến lược mở rộng (Scaling): Horizontal vs. Vertical
+
 
 ### 9.3. Tinh chỉnh hiệu năng: Tối ưu hoá Nginx Workers và `ulimit`
 
@@ -653,6 +693,9 @@ Báo cáo này đã bao gồm rất nhiều thông tin. Dưới đây là một 
 </table>
 
 ### 10.2. Quản lý vòng đời API (API Lifecycle Management) và Best Practices
+
+
+
 
 
 
